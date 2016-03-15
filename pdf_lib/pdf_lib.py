@@ -28,12 +28,14 @@ class PdfLibBuild(object):
 
         ## take care of dir
         if not lib_dir:
-            lib_dir = time.strftime('PDF_Lib_%Y-%m-%d') 
+            lib_dir = time.strftime('PDF_Lib_%Y-%m-%d')
         working_dir = os.path.expanduser('~/' + lib_dir)
+        self.working_dir = working_dir
         # python2
         if os.path.isdir(working_dir):
             pass
-        os.makedirs(working_dir)
+        else:
+            os.makedirs(working_dir)
         print('Lib dir %s has been built' % working_dir)
 
     def SpaceGroupLib(self, space_group_symbol, size_limit=None):
@@ -65,10 +67,12 @@ class PdfLibBuild(object):
             cif_dir = os.path.join(working_dir, space_group_symbol, 'cif_data')
             if os.path.isdir(pdf_dir):
                 pass
-            os.makedirs(pdf_dir)
+            else:
+                os.makedirs(pdf_dir)
             if os.path.isdir(cif_dir):
                 pass
-            os.makedirs(cif_dir)
+            else:
+                os.makedirs(cif_dir)
 
             ## search query
             m = MPRester(self.API_key)
