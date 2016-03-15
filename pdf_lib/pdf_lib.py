@@ -49,7 +49,7 @@ class PdfLibBuild(object):
 
         ## changing dir
         os.chdir(self.working_dir)
-        if os.getcwd() == working_dir:
+        if os.getcwd() == self.working_dir:
             print('Library will be built at %s' % self.working_dir)
         else:
             print('Werid, return')
@@ -63,8 +63,8 @@ class PdfLibBuild(object):
 
             print('Building library with space_group symbol: {}'.format(space_group_symbol))
             ## create dirs
-            pdf_dir = os.path.join(working_dir, space_group_symbol, 'PDF_data')
-            cif_dir = os.path.join(working_dir, space_group_symbol, 'cif_data')
+            pdf_dir = os.path.join(self.working_dir, space_group_symbol, 'PDF_data')
+            cif_dir = os.path.join(self.working_dir, space_group_symbol, 'cif_data')
             if os.path.isdir(pdf_dir):
                 pass
             else:
