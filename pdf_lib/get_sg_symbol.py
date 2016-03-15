@@ -29,8 +29,8 @@ def get_symbol_list(crystal_system):
             if position_ind:
                 head = min(position_ind)
                 tail = max(position_ind)
-                symb = read[head:tail]
-                #print(symb) degug line
+                symb = read[head+1:tail]
+                print(symb) #degug line
                 symb_list.append(symb)
             else:
                 pass
