@@ -116,7 +116,7 @@ class PdfLibBuild(object):
         # summary lists
         missed_list = [] # reference
         m_id_list = [] # reference for searchs have been done in the past
-
+        time_info = time.strftime('%Y-%m-%d')
         # create dirs, cif and calculated dir
         cif_dir = os.path.join(data_dir, 'cif_data')
         self._makedirs(cif_dir)
@@ -169,16 +169,29 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
         return cif_dir       
         
     def gr_lib_build(self, cif_lib_path):
+        ''' method to calculate G(r) based on path of cif library located at.
+    
+        Paramters of G(r) calculation are set via glbl.<attribute>, one can tune it based on purpose of building library.
+        After entire method, text file contains all G(r), space_group_symbol and material name will be saved respectively
+
+        Parameters
+        ----------
         
+        cif_lib_path : str
+            path to lib of cif files
+        
+        ''' 
         el_list = []   # data column 
-        r_grid = [] # data x-axis
-        gr_list = []   # data y-axis 
+        r_grid = np.array([]) # data x-axis
+        gr_list = np.array([])   # data y-axis 
         space_group_symbol_list = [] # reference for search have been done in the past        
 
         # set up calculation environment
         dbc = DebyePDFCalculator()
         cfg = {'qmin': glbl.q_min, 'qmax':glbl.q_max, 'rmin':glbl.r_min, 'rmax': glbl.r_max}
         Bisoequiv = glbl.Bisoequiv #FIXME: current value = 0.5, need to figure out the most suitable value
+        print('Parameter used in this PDF calculator is: {}'.format(cfg))
+        print('Bisoequiv used in this PDF calculator is: {}'.format(Bisoequiv))
 
         # step 1: list cif dir
         output_dir = os.path.join(self.data_dir, 'lib_data')
@@ -188,30 +201,36 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
         
         for cif in cif_f_list:
             # part 2: calculate PDF with diffpy
-            struc = loadStructure(cif)
+            struc = loadStructure(os.path.join(self.cif_dir, cif))
             struc.Bisoequiv =  Bisoequiv
             (r,g) = dbc(nosymmetry(struc), **cfg)
+            print('Finished calculation of G(r) on {}'.format(cif))
             sep = cif.index('_')
             space_group_symbol = cif[:sep]
-            m_name = cif[sep:]
+            m_name = cif[sep+1:]
             # part 3: save data
-            gr_list.append(g)
+            gr_list = np.concatenate([gr_list, g], axis=0)
             space_group_symbol_list.append(space_group_symbol)
             el_list.append(m_name)
+            #space_group_symbol_list = np.concatenate([space_group_symbol_list, space_group_symbol], axis=0)
+            #el_list = np.concatenate([el_list, m_name], axis=0)
 
         time_info = time.strftime('%Y-%m-%d')
-        
         gr_list_name = '{}_{}_Gr.txt'.format(self.crystal_system, time_info)
         gr_list_w_name = os.path.join(output_dir, gr_list_name)
         np.savetxt(gr_list_w_name, gr_list)
 
+        r_grid_name = '{}_{}_rgrid.txt'.format(self.crystal_system, time_info)
+        r_grid_w_name = os.path.join(output_dir, r_grid_name)
+        np.savetxt(r_grid_w_name, r)
+        
         space_group_symbol_list_name = '{}_{}_SpaceGroupSymbol.txt'.format(self.crystal_system, time_info)
         space_group_symbol_list_w_name= os.path.join(output_dir, space_group_symbol_list_name)
-        np.savetxt(space_group_symbol_list_w_name, space_group_symbol_list)
+        np.savetxt(space_group_symbol_list_w_name, space_group_symbol_list, fmt="%s")
         
         el_list_name = '{}_{}_Element.txt'.format(self.crystal_system, time_info)
         el_list_w_name = os.path.join(output_dir, el_list_name)
-        np.savetxt(el_list_w_name, el_list)
+        np.savetxt(el_list_w_name, el_list, fmt="%s")
         
         print('''SUMMARY: for {} cystsal sytem,
 Number of cif pulled out and G(r) calculated is {}'''.format(self.crystal_system, len(gr_list)))
