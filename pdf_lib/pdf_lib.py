@@ -80,8 +80,8 @@ class PdfLibBuild(object):
         else:
             os.makedirs(path_name)
     
-    def SpaceGroupLib(self, crystal_system, save_gr = True, size_limit=None):
-        ''' function to build up pdf library based on space group symbol
+    def build_lib(self, crystal_system, save_gr = True, size_limit=None):
+        ''' function to build cif and pdf library based on space group symbol
         
         Parameters
         ----------
@@ -126,7 +126,6 @@ class PdfLibBuild(object):
         self._makedirs(cif_dir)
         self._makedirs(output_dir)
         # looping
-        cif_ind = 0
         for space_group_symbol in space_group_symbol_set:
             print('Building library with space_group symbol: {}'.format(space_group_symbol))
             ## search query
@@ -150,13 +149,14 @@ class PdfLibBuild(object):
                     m_name = m_formula.replace(' ', '') # material name
                     
                     cif_w = CifWriter(m_struc)
-                    cif_name = os.path.join(cif_dir, m_name + '.cif')
-                    cif_w.write_file(cif_name)
-                    if os.path.isfile(cif_name):
-                        print('%s.cif has been saved' % str(m_name))
+                    cif_name = '{}_{}.cif'.format(space_group_symbol, m_name)
+                    cif_w_name = os.path.join(cif_dir, cif_name)                   
+ 
+                    if os.path.isfile(cif_w_name):
+                       pass # skip files already exist
                     else:
-                        print('Something went wrong at %s cif data' % m_name)
-                    cif_ind += 1
+                        cif_w.write_file(cif_w_name)
+                        print('{} has been saved'.format(cif_name))
 
                     # part 2: calculate PDF with diffpy
                     struc = loadStructure(cif_name)
@@ -196,6 +196,6 @@ class PdfLibBuild(object):
         np.savetext(m_id_list_w_name, m_id_list)
 
         print('''SUMMARY: for {} cystsal sytem,
-Pulled out {} cif data, Calculated {} G(r) data
-and these symbols {} can't be found from data base'''.format(crystal_system, cif_ind, len(gr_list), missed_list))
+Number of cif pulled out and G(r) calculated is {}
+Symbols {} can't be found from data base'''.format(crystal_system, len(gr_list), missed_list))
         return
