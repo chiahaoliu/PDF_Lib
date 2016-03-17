@@ -182,16 +182,14 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
         
         ''' 
         el_list = []   # data column 
-        r_grid = np.array([]) # data x-axis
-        gr_list = np.array([])   # data y-axis 
         space_group_symbol_list = [] # reference for search have been done in the past        
 
         # set up calculation environment
         dbc = DebyePDFCalculator()
         cfg = {'qmin': glbl.q_min, 'qmax':glbl.q_max, 'rmin':glbl.r_min, 'rmax': glbl.r_max}
         Bisoequiv = glbl.Bisoequiv #FIXME: current value = 0.5, need to figure out the most suitable value
-        print('Parameter used in this PDF calculator is: {}'.format(cfg))
-        print('Bisoequiv used in this PDF calculator is: {}'.format(Bisoequiv))
+        print('====Parameter used in this PDF calculator is: {}===='.format(cfg))
+        print('====Bisoequiv used in this PDF calculator is: {}===='.format(Bisoequiv))
 
         # step 1: list cif dir
         output_dir = os.path.join(self.data_dir, 'lib_data')
@@ -199,6 +197,13 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
         self.output_dir = output_dir
         cif_f_list = [ f for f in os.listdir(self.cif_dir)]
         
+        # hidden step as numpy can't take an empty array and stack
+        struc = loadStructure(os.path.join(self.cif_dir, cif_f_list[0]))
+        struc.Bisoequiv =  Bisoequiv
+        (r,g) = dbc(nosymmetry(struc), **cfg)
+        r_grid = np.array(r) # data x-axis
+        gr_list = np.empty_like(np.array(g)) # data y-axis        
+
         for cif in cif_f_list:
             # part 2: calculate PDF with diffpy
             struc = loadStructure(os.path.join(self.cif_dir, cif))
@@ -209,15 +214,19 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
             space_group_symbol = cif[:sep]
             m_name = cif[sep+1:]
             # part 3: save data
-            gr_list = np.concatenate([gr_list, g], axis=0)
+            #if not gr_list.any():
+                #gr_list = np.append(gr_list, g)
+            gr_list = np.vstack((gr_list,g))
             space_group_symbol_list.append(space_group_symbol)
             el_list.append(m_name)
+            print('size of gr_list = {}'.format(np.shape(gr_list)))
             #space_group_symbol_list = np.concatenate([space_group_symbol_list, space_group_symbol], axis=0)
             #el_list = np.concatenate([el_list, m_name], axis=0)
 
         time_info = time.strftime('%Y-%m-%d')
         gr_list_name = '{}_{}_Gr.txt'.format(self.crystal_system, time_info)
         gr_list_w_name = os.path.join(output_dir, gr_list_name)
+        print('Saving {}'.format(gr_list_w_name))
         np.savetxt(gr_list_w_name, gr_list)
 
         r_grid_name = '{}_{}_rgrid.txt'.format(self.crystal_system, time_info)
@@ -233,5 +242,5 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
         np.savetxt(el_list_w_name, el_list, fmt="%s")
         
         print('''SUMMARY: for {} cystsal sytem,
-Number of cif pulled out and G(r) calculated is {}'''.format(self.crystal_system, len(gr_list)))
-        return gr_list
+Number of cif pulled out and G(r) calculated is {}'''.format(self.crystal_system, np.shape(gr_list)))
+        return
