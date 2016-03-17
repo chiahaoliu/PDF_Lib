@@ -219,7 +219,7 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
             gr_list = np.vstack((gr_list,g))
             space_group_symbol_list.append(space_group_symbol)
             el_list.append(m_name)
-            print('size of gr_list = {}'.format(np.shape(gr_list)))
+            #print('size of gr_list = {}'.format(np.shape(gr_list)))
             #space_group_symbol_list = np.concatenate([space_group_symbol_list, space_group_symbol], axis=0)
             #el_list = np.concatenate([el_list, m_name], axis=0)
 
@@ -241,6 +241,7 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
         el_list_w_name = os.path.join(output_dir, el_list_name)
         np.savetxt(el_list_w_name, el_list, fmt="%s")
         
-        print('''SUMMARY: for {} cystsal sytem,
+        print('''====SUMMARY====:
+for {} cystsal sytem,
 Number of cif pulled out and G(r) calculated is {}'''.format(self.crystal_system, np.shape(gr_list)))
         return
