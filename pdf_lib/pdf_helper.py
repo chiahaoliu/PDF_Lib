@@ -11,9 +11,10 @@ from diffpy.srreal.bondcalculator import BondCalculator
 from diffpy.srreal.pdfcalculator import PDFCalculator
 from diffpy.srreal.pdfcalculator import DebyePDFCalculator
 
-from pdf_lib.glbl import glbl
+#from pdf_lib.glbl import glbl
+from glbl import glbl
 
-def read_full_gr(f_name, rmin=glbl.r_min, rmax = glbl.r_max, skip_num=glbl.skip_num):
+def read_full_gr(f_name, rmin=glbl.r_min, rmax = glbl.r_max, skip_num=glbl.skip_row):
     ''' simple function to read .gr data generated from PDFgui'''
 
     read_in = np.loadtxt(str(f_name), skiprows = skip_num)

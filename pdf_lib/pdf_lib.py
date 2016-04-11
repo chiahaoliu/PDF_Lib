@@ -244,4 +244,4 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
         print('''====SUMMARY====:
 for {} cystsal sytem,
 Number of cif pulled out and G(r) calculated is {}'''.format(self.crystal_system, np.shape(gr_list)))
-        return
+        return gr_list
