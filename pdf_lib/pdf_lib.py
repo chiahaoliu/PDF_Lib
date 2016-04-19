@@ -12,6 +12,7 @@ from pymatgen.io.cif import CifWriter
 from diffpy.Structure import loadStructure
 from diffpy.srreal.structureadapter import nosymmetry
 from diffpy.srreal.pdfcalculator import DebyePDFCalculator
+from diffpy.srreal.pdfcalculator import PDFCalculator
 
 #from pdf_lib.glbl import glbl
 from glbl import glbl
@@ -185,7 +186,9 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
         space_group_symbol_list = [] # reference for search have been done in the past        
 
         # set up calculation environment
-        dbc = DebyePDFCalculator()
+        #dbc = DebyePDFCalculator()
+        pdf = PDFCalculator()
+        pdf.rstep = glbl.rstep
         cfg = {'qmin': glbl.q_min, 'qmax':glbl.q_max, 'rmin':glbl.r_min, 'rmax': glbl.r_max}
         Bisoequiv = glbl.Bisoequiv #FIXME: current value = 0.5, need to figure out the most suitable value
         print('====Parameter used in this PDF calculator is: {}===='.format(cfg))
@@ -200,7 +203,7 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
         # hidden step as numpy can't take an empty array and stack
         struc = loadStructure(os.path.join(self.cif_dir, cif_f_list[0]))
         struc.Bisoequiv =  Bisoequiv
-        (r,g) = dbc(nosymmetry(struc), **cfg)
+        (r,g) = pdf(nosymmetry(struc), **cfg)
         r_grid = np.array(r) # data x-axis
         gr_list = np.empty_like(np.array(g)) # data y-axis        
 
@@ -208,7 +211,8 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
             # part 2: calculate PDF with diffpy
             struc = loadStructure(os.path.join(self.cif_dir, cif))
             struc.Bisoequiv =  Bisoequiv
-            (r,g) = dbc(nosymmetry(struc), **cfg)
+            #(r,g) = pdf(nosymmetry(struc), **cfg)
+            (r,g) = pdf(struc, **cfg)
             print('Finished calculation of G(r) on {}'.format(cif))
             sep = cif.index('_')
             space_group_symbol = cif[:sep]
@@ -224,22 +228,22 @@ Symbols {} can't be found from data base'''.format(crystal_system, missed_list))
             #el_list = np.concatenate([el_list, m_name], axis=0)
 
         time_info = time.strftime('%Y-%m-%d')
-        gr_list_name = '{}_{}_Gr.txt'.format(self.crystal_system, time_info)
+        gr_list_name = '{}_{}_Gr'.format(self.crystal_system, time_info)
         gr_list_w_name = os.path.join(output_dir, gr_list_name)
         print('Saving {}'.format(gr_list_w_name))
-        np.savetxt(gr_list_w_name, gr_list)
+        np.save(gr_list_w_name, gr_list)
 
-        r_grid_name = '{}_{}_rgrid.txt'.format(self.crystal_system, time_info)
+        r_grid_name = '{}_{}_rgrid'.format(self.crystal_system, time_info)
         r_grid_w_name = os.path.join(output_dir, r_grid_name)
-        np.savetxt(r_grid_w_name, r)
+        np.save(r_grid_w_name, r)
         
-        space_group_symbol_list_name = '{}_{}_SpaceGroupSymbol.txt'.format(self.crystal_system, time_info)
+        space_group_symbol_list_name = '{}_{}_SpaceGroupSymbol'.format(self.crystal_system, time_info)
         space_group_symbol_list_w_name= os.path.join(output_dir, space_group_symbol_list_name)
-        np.savetxt(space_group_symbol_list_w_name, space_group_symbol_list, fmt="%s")
+        np.save(space_group_symbol_list_w_name, space_group_symbol_list) #fmt="%s")
         
-        el_list_name = '{}_{}_Element.txt'.format(self.crystal_system, time_info)
+        el_list_name = '{}_{}_Element'.format(self.crystal_system, time_info)
         el_list_w_name = os.path.join(output_dir, el_list_name)
-        np.savetxt(el_list_w_name, el_list, fmt="%s")
+        np.save(el_list_w_name, el_list) #fmt="%s")
         
         print('''====SUMMARY====:
 for {} cystsal sytem,
