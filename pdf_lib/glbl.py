@@ -23,15 +23,15 @@ skipRow = 27
 m_id_list_name= 'mid_list.yaml'
 
 
-class glbl():
-    r_min = rmin 
-    r_max = rmax
-    q_min = qmin
-    q_max = qmax
+# put calculation config together
+cfg = {'qmin':qmin, 'qmax':qmax, 'rmin':rmin, 'rmax':rmax}
+
+class Glbl:
+    cfg = cfg
     rstep = rstep
     skip_row = skipRow
     DW_factor = dwFactor
     Bisoequiv = bIsoequiv
     m_id_list = m_id_list_name
 
-glbl = glbl()
+glbl = Glbl()
