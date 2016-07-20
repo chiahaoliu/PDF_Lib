@@ -16,7 +16,7 @@ from diffpy.srreal.pdfcalculator import DebyePDFCalculator
 from diffpy.srreal.pdfcalculator import PDFCalculator
 
 #from pdf_lib.glbl import glbl
-from glbl import glbl
+from .glbl import glbl
 
 
 def _makedirs(path_name):
@@ -49,6 +49,10 @@ class PDF_cal:
             input_dir = os.getcwd()
         self.input_dir = input_dir
         self.output_dir = None # overwrite it later
+        self.gr_array = None
+        self.fail_list = None
+        self.r_grid = None
+        self.composition_list = None
 
     def gr_lib_build(self, output_dir=None, DebyeCal=False,
                      nosymmetry=False):
@@ -108,26 +112,34 @@ class PDF_cal:
             except: # too many unexpected errors from open data base
                 fail_list.append(cif)
                 pass
-        gr_len = len(g)
-        gr_list_len = len(gr_list)
-        gr_array = np.asarray(gr_list)
-        gr_array.resize(gr_list_len/gr_len, gr_len)
+        # set attributes
+        self.gr_array = np.asarray(gr_list)
+        self.fail_list = fail_list
+        self.r_grid = r
+        self.composition_list = composition_list
+
+    def save_data(self):
+        timestr = _timestampstr(time.time())
+        output_dir = self.output_dir
         gr_array_name = '{}_Gr'.format(timestr)
-        gr_array_w_name = os.path.join(self.output_dir, gr_list_name)
-        print('Saving {}'.format(gr_array_w_name))
-        np.save(gr_array_w_name, gr_array)
-        del gr_list
+        gr_array_w_name = os.path.join(output_dir, gr_array_name)
 
-        r_grid_name = '{}_rgrid'.format(time_str)
+        np.save(gr_array_w_name, self.gr_array)
+
+        r_grid_name = '{}_rgrid'.format(timestr)
         r_grid_w_name = os.path.join(output_dir, r_grid_name)
-        np.save(r_grid_w_name, r)
+        np.save(r_grid_w_name, self.r_grid)
 
-        composition_list_name = '{}_composition'.format(timestr)
+        composition_list_name = '{}_composition_list'.format(timestr)
         composition_list_w_name= os.path.join(output_dir,
-                                              composition_list_w_name)
-        np.savetxt(composition_list_w_name, composition_list, fmt="%s")
+                                              composition_list_name)
+        np.savetxt(composition_list_w_name, self.composition_list, fmt="%s")
+
+        fail_list_name = '{}_fail_list'.format(timestr)
+        fail_list_w_name = os.path.join(output_dir,
+                                        fail_list_name)
+        np.savetxt(fail_list_w_name, self.fail_list, fmt="%s")
 
         print("======== SUMMARY ======== ")
         print("Number of G(r) calculated is {}"
-              .format(np.shape(gr_array)[0]))
-        return gr_array
+              .format(np.shape(self.gr_array)[0]))
