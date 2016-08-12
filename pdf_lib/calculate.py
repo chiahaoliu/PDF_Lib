@@ -1,4 +1,3 @@
-
 import os
 import time
 import yaml
@@ -47,6 +46,7 @@ class PDF_cal:
         # set up API_key
         if input_dir is None:
             input_dir = os.getcwd()
+        print('=== Input dir set to {}, change it if needed ==='.format(input_dir))
         self.input_dir = input_dir
         self.output_dir = None # overwrite it later
         self.gr_array = None
@@ -66,7 +66,9 @@ class PDF_cal:
         ----------
         output_dir : str
             optional. path to lib of cif files. Default is
-            "self.inputdir/PDFLib_{time}_{parameter}/".
+            "{inputdir}/PDFLib_{time}/"
+            a "PDFCal_config.txt" file with PDFCalculator
+            configuration will also be saved in output directory
         DebyeCal : bool
             option to use Debye calculator. default is False.
         nosymmetry : bool
@@ -75,10 +77,10 @@ class PDF_cal:
         '''
         timestr = _timestampstr(time.time())
         if output_dir is None:
-            tail = "PDF_{}_{}".format(timestr, glbl.cfg)
-            output_dir = os.path.join(self.input_dir, tail)
+            tail = "PDF_{}".format(timestr)
+            output_dir = os.path.join(os.getcwd(), tail)
+        print('=== output dir would be {} ==='.format(output_dir))
         self.output_dir = output_dir
-        _makedirs(self.output_dir)
 
         # set up calculation environment
         if DebyeCal:
@@ -87,28 +89,29 @@ class PDF_cal:
         cal.rstep = glbl.rstep
         cfg = glbl.cfg
         Bisoequiv = glbl.Bisoequiv
-        print("====Parameter used in this PDF calculator is: {}===="
+        print("==== Parameter used in this PDF calculator is: {} ===="
               .format(cfg))
-        print("====Bisoequiv used in this PDF calculator is: {}===="
+        print("==== Bisoequiv used in this PDF calculator is: {} ===="
               .format(Bisoequiv))
 
-        # step 1: list cif dir
-
-        cif_f_list = [ f for f in os.listdir(self.input_dir)]
+        # list cif dir
+        cif_f_list = [ f for f in os.listdir(self.input_dir) if
+                       os.path.isfile(os.path.join(self.input_dir, f))]
         gr_list = []
         composition_list = []
         fail_list = []
         for cif in cif_f_list:
-            # part 2: calculate PDF with diffpy
+            # calculate PDF with diffpy
             try:
                 struc = loadStructure(os.path.join(self.input_dir, cif))
                 struc.Bisoequiv =  Bisoequiv
                 if nosymmetry:
                     (r,g) = cal(nosymmetry(struc), **cfg)
                 (r,g) = cal(struc, **cfg)
-                print('Finished calculation of G(r) on {}'.format(cif))
+                print('=== Finished calculation of G(r) on {} ==='.format(cif))
                 gr_list.append(g)
                 composition_list.append(struc.composition)
+                self.r_grid = r
             except: # too many unexpected errors from open data base
                 fail_list.append(cif)
                 pass
@@ -119,8 +122,17 @@ class PDF_cal:
         self.composition_list = composition_list
 
     def save_data(self):
-        timestr = _timestampstr(time.time())
+        """ a method to save outputs """
         output_dir = self.output_dir
+        _makedirs(output_dir)
+        # save config of calculator
+        with open(os.path.join(output_dir, 'PDFCal_config.txt'), 'w') as f:
+            para_dict = dict(glbl.cfg)
+            para_dict.update(DW_factor=glbl.DW_factor)
+            para_dict.update(Biso=glbl.Bisoequiv)
+            f.write(str(para_dict))
+        # save gr, r, composition and fail list
+        timestr = _timestampstr(time.time())
         gr_array_name = '{}_Gr'.format(timestr)
         gr_array_w_name = os.path.join(output_dir, gr_array_name)
 
@@ -130,15 +142,19 @@ class PDF_cal:
         r_grid_w_name = os.path.join(output_dir, r_grid_name)
         np.save(r_grid_w_name, self.r_grid)
 
-        composition_list_name = '{}_composition_list'.format(timestr)
+        composition_list_name = '{}_composition_list.yaml'.format(timestr)
         composition_list_w_name= os.path.join(output_dir,
                                               composition_list_name)
-        np.savetxt(composition_list_w_name, self.composition_list, fmt="%s")
+        #np.savetxt(composition_list_w_name, self.composition_list, fmt="%s")
+        with open(composition_list_w_name, 'w') as f:
+            yaml.dump(self.composition_list, f)
 
-        fail_list_name = '{}_fail_list'.format(timestr)
+        fail_list_name = '{}_fail_list.yaml'.format(timestr)
         fail_list_w_name = os.path.join(output_dir,
                                         fail_list_name)
-        np.savetxt(fail_list_w_name, self.fail_list, fmt="%s")
+        #np.savetxt(fail_list_w_name, self.fail_list, fmt="%s")
+        with open(fail_list_w_name, 'w') as f:
+            yaml.dump(self.fail_list, f)
 
         print("======== SUMMARY ======== ")
         print("Number of G(r) calculated is {}"
