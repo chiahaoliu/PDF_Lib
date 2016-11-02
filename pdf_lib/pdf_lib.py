@@ -15,7 +15,7 @@ from diffpy.srreal.pdfcalculator import DebyePDFCalculator
 from diffpy.srreal.pdfcalculator import PDFCalculator
 
 #from pdf_lib.glbl import glbl
-from glbl import glbl
+#from glbl import glbl
 
 class PdfLibBuild(object):
     ''' a class to look up cif data and calculate pdf automatically

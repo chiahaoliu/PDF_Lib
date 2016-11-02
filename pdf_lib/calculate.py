@@ -48,15 +48,22 @@ class PDF_cal:
             input_dir = os.getcwd()
         print('=== Input dir set to {}, change it if needed ==='.format(input_dir))
         self.input_dir = input_dir
+        #get the stem
+        full_path = os.path.abspath(input_dir)
+        path_str = full_path.split('/')
+        parent_folder_name = path_str[-2]
+        self.stem = parent_folder_name
         self.output_dir = None # overwrite it later
         self.gr_array = None
         self.fail_list = None
         self.r_grid = None
         self.composition_list = None
+        self.calculate_params = {}
 
-    def gr_lib_build(self, output_dir=None, DebyeCal=False,
+    def gr_lib_build(self, output_dir=None, pdfcal_cfg=None,
+                     Bisoequiv=0.1, rstep=None, DebyeCal=False,
                      nosymmetry=False):
-        ''' method to calculate G(r) based on path of cif library located at.
+        """ method to calculate G(r) based on path of cif library located at.
 
         Paramters of G(r) calculation are set via glbl.<attribute>.
         After entire method, .npy file contains all G(r), space_group_symbol
@@ -64,17 +71,25 @@ class PDF_cal:
 
         Parameters
         ----------
-        output_dir : str
-            optional. path to lib of cif files. Default is
-            "{inputdir}/PDFLib_{time}/"
-            a "PDFCal_config.txt" file with PDFCalculator
+        output_dir : str, optional
+            optional. path to lib of cif files. 
+            Default is "{inputdir}/PDFLib_{time}/"
+            "PDFCal_config.txt" file with PDFCalculator
             configuration will also be saved in output directory
-        DebyeCal : bool
+        pdfcal_cfg : dict, optional
+            configuration of PDF calculator, default is the one defined
+            inside glbl class.
+        Bisoequiv : float, optional
+            value of isotropic thermal parameter. default is 0.1.
+            scientific equation: Biso = 8 (pi**2) Uiso
+        rstep : float, optioanl
+            space of PDF. default is pi/100.
+        DebyeCal : bool, optional
             option to use Debye calculator. default is False.
-        nosymmetry : bool
+        nosymmetry : bool, optional
             option to apply no symmetry. default is False.
 
-        '''
+        """
         timestr = _timestampstr(time.time())
         if output_dir is None:
             tail = "PDF_{}".format(timestr)
@@ -82,18 +97,29 @@ class PDF_cal:
         print('=== output dir would be {} ==='.format(output_dir))
         self.output_dir = output_dir
 
-        # set up calculation environment
+        # instantiate calculator
         if DebyeCal:
             cal = DebyePDFCalculator()
+            self.calculator_type = 'Debye'
         cal = PDFCalculator()
-        cal.rstep = glbl.rstep
-        cfg = glbl.cfg
-        Bisoequiv = glbl.Bisoequiv
+        self.calculator_type = 'PDF'
+        self.calculate_params.update({'calculator_type':
+                                      self.calculator_type})
+
+        # setup calculator parameters
+        if rstep is None:
+            rstep = glbl.rstep
+        self.rstep = rstep
+        self.calculate_params.update({'rstep':rstep})
+
+        if pdfcal_cfg is None:
+            pdfcal_cfg = glbl.cfg
+        self.calculate_params.update(pdfcal_cfg)
+
         print("==== Parameter used in this PDF calculator is: {} ===="
-              .format(cfg))
+              .format(pdfcal_cfg))
         print("==== Bisoequiv used in this PDF calculator is: {} ===="
               .format(Bisoequiv))
-
         # list cif dir
         cif_f_list = [ f for f in os.listdir(self.input_dir) if
                        os.path.isfile(os.path.join(self.input_dir, f))]
@@ -106,8 +132,8 @@ class PDF_cal:
                 struc = loadStructure(os.path.join(self.input_dir, cif))
                 struc.Bisoequiv =  Bisoequiv
                 if nosymmetry:
-                    (r,g) = cal(nosymmetry(struc), **cfg)
-                (r,g) = cal(struc, **cfg)
+                    (r,g) = cal(nosymmetry(struc), **pdfcal_cfg)
+                (r,g) = cal(struc, **pdfcal_cfg)
                 print('=== Finished calculation of G(r) on {} ==='.format(cif))
                 gr_list.append(g)
                 composition_list.append(struc.composition)
@@ -127,29 +153,28 @@ class PDF_cal:
         _makedirs(output_dir)
         # save config of calculator
         with open(os.path.join(output_dir, 'PDFCal_config.txt'), 'w') as f:
-            para_dict = dict(glbl.cfg)
-            para_dict.update(DW_factor=glbl.DW_factor)
-            para_dict.update(Biso=glbl.Bisoequiv)
+            para_dict = dict(self.calculate_params)
             f.write(str(para_dict))
         # save gr, r, composition and fail list
         timestr = _timestampstr(time.time())
-        gr_array_name = '{}_Gr'.format(timestr)
+        gr_array_name = '{}_{}_Gr'.format(self.stem, timestr)
         gr_array_w_name = os.path.join(output_dir, gr_array_name)
 
         np.save(gr_array_w_name, self.gr_array)
 
-        r_grid_name = '{}_rgrid'.format(timestr)
+        r_grid_name = '{}_{}_rgrid'.format(self.stem, timestr)
         r_grid_w_name = os.path.join(output_dir, r_grid_name)
         np.save(r_grid_w_name, self.r_grid)
 
-        composition_list_name = '{}_composition_list.yaml'.format(timestr)
+        composition_list_name = "{}_{}_composition_list.yaml"\
+                                .format(self.stem, timestr)
         composition_list_w_name= os.path.join(output_dir,
                                               composition_list_name)
         #np.savetxt(composition_list_w_name, self.composition_list, fmt="%s")
         with open(composition_list_w_name, 'w') as f:
             yaml.dump(self.composition_list, f)
 
-        fail_list_name = '{}_fail_list.yaml'.format(timestr)
+        fail_list_name = '{}_{}_fail_list.yaml'.format(self.stem, timestr)
         fail_list_w_name = os.path.join(output_dir,
                                         fail_list_name)
         #np.savetxt(fail_list_w_name, self.fail_list, fmt="%s")
