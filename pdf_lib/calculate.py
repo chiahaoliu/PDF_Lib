@@ -14,6 +14,18 @@ from diffpy.srreal.structureadapter import nosymmetry
 from diffpy.srreal.pdfcalculator import DebyePDFCalculator
 from diffpy.srreal.pdfcalculator import PDFCalculator
 
+from pymatgen.io.cif import CifParser
+from pymatgen.analysis.diffraction.xrd import XRDCalculator
+
+# pymatgen syntax
+"""
+struc = CifParser(<fp>).get_structures().pop()
+meta_tuple = struc.lattice.abc + aa.lattice.angles
+volume = struc.volume
+spacegroup_info = struc.get_space_group_info()
+element_info = struc.species  # a list
+"""
+
 #from pdf_lib.glbl import glbl
 from .glbl import glbl
 
@@ -61,8 +73,8 @@ class PDF_cal:
         self.calculate_params = {}
 
     def gr_lib_build(self, output_dir=None, pdfcal_cfg=None,
-                     Bisoequiv=0.1, rstep=None, DebyeCal=False,
-                     nosymmetry=False):
+                     rdf=True, Bisoequiv=0.1, rstep=None,
+                     DebyeCal=False, nosymmetry=False):
         """ method to calculate G(r) based on path of cif library located at.
 
         Paramters of G(r) calculation are set via glbl.<attribute>.
@@ -79,6 +91,9 @@ class PDF_cal:
         pdfcal_cfg : dict, optional
             configuration of PDF calculator, default is the one defined
             inside glbl class.
+        rdf : bool, optional
+            option to return RDF or not. default to True, if not,
+            return pdf
         Bisoequiv : float, optional
             value of isotropic thermal parameter. default is 0.1.
             scientific equation: Biso = 8 (pi**2) Uiso
@@ -126,15 +141,25 @@ class PDF_cal:
         gr_list = []
         composition_list = []
         fail_list = []
+        # configure calculator
+        for k,v in pdfcal_cfg.items():
+            setattr(cal, k, v)
         for cif in cif_f_list:
             # calculate PDF with diffpy
             try:
                 struc = loadStructure(os.path.join(self.input_dir, cif))
                 struc.Bisoequiv =  Bisoequiv
-                if nosymmetry:
-                    (r,g) = cal(nosymmetry(struc), **pdfcal_cfg)
-                (r,g) = cal(struc, **pdfcal_cfg)
-                print('=== Finished calculation of G(r) on {} ==='.format(cif))
+                #if nosymmetry:
+                #    (r,g) = cal(nosymmetry(struc), **pdfcal_cfg)
+                cal.setStructure(struc)
+                cal.eval()
+
+                print('=== Finished evaluating structure {} ==='
+                       .format(cif))
+                if rdf:
+                    gr_list.append(cal.rdf)
+                else:
+                    gr_list.append(cal.pdf)
                 gr_list.append(g)
                 composition_list.append(struc.composition)
                 self.r_grid = r
