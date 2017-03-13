@@ -6,8 +6,8 @@ rmin = 0.5
 rmax = 25.
 
 # q_min and q_max used when calculating PDF
-qmin = 0.
-qmax = 100.
+qmin = 0.5
+qmax = 25.
 
 # Nynquist step
 rstep = np.pi / qmax
