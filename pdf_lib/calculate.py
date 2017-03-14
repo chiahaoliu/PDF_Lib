@@ -131,7 +131,7 @@ class PDFLibBuilder:
         composition_list_1 = []
         # (a,b,c, alpha, beta, gamma, volume)
         structure_list_1 = []  # primative cell
-        fail_list_1 = []
+        fail_list = []
 
         ####### configure diffpy PDF calculator ######
         if DebyeCal:
@@ -165,51 +165,51 @@ class PDFLibBuilder:
         composition_list_2 = []
         # (a,b,c, alpha, beta, gamma, volume)
         structure_list_2 = []
-        fail_list_2 = []
 
         ############# loop through cifs #################
         cif_f_list = [ f for f in os.listdir(self.input_dir) if
                        f.endswith('.cif')]
         for cif in cif_f_list:
             _cif = os.path.join(self.input_dir, cif)
-            # calculate PDF/RDF with diffpy
             try:
-                struc = loadStructure(_cif)
-                struc.Bisoequiv = Bisoequiv
+                # diffpy structure
+                struc2 = loadStructure(_cif)
+                struc2.Bisoequiv = Bisoequiv
+                # pymatge structure
+                struc = CifParser(_cif).get_structures().pop()
+
+                # calculate PDF/RDF with diffpy
                 #if nosymmetry:
                 #    (r,g) = cal(nosymmetry(struc), **pdfcal_cfg)
-                cal.setStructure(struc)
+                cal.setStructure(struc2)
                 cal.eval()
-                print('=== Finished evaluating PDF from structure {} ==='
-                       .format(cif))
+
+                # calculate XRD with pymatgen
+                xrd = xrd_cal.get_xrd_data(struc)
+
+                # update features
                 if rdf:
                     gr_list.append(cal.rdf)
                 else:
                     gr_list.append(cal.pdf)
-                # update features
-                composition_list_2.append(struc.composition)
-                meta_tuple = struc.lattice.abcABG()+\
-                             (struc.lattice.volume,)
-                structure_list_2.append(meta_tuple)
-            except:
-                fail_list_2.append(cif)
-                pass
-            try:
-                # calculate XRD with pymatgen
-                struc = CifParser(_cif).get_structures().pop()
-                xrd = xrd_cal.get_xrd_data(struc)
+                composition_list_2.append(struc2.composition)
+                meta_tuple2 = struc2.lattice.abcABG()+\
+                              (struc2.lattice.volume,)
+                structure_list_2.append(meta_tuple2)
+                print('=== Finished evaluating PDF from structure {} ==='
+                       .format(cif))
+
                 xrd_list.append(np.asarray(xrd)[:,:2])
                 sg_list.append(struc.get_space_group_info())
                 meta_tuple = struc.lattice.abc + struc.lattice.angles\
                              + (struc.volume,)
-                # update features
+
                 structure_list_1.append(meta_tuple)
                 composition_list_1.append(struc.composition.as_dict())
                 print('=== Finished evaluating XRD from structure {} ==='
                       .format(cif))
             except:
-                fail_list_1.append(cif)
-                pass
+                fail_list.append(cif)
 
         # finally, store crucial calculation results as attributes
         self.r_grid = cal.rgrid
@@ -221,8 +221,7 @@ class PDFLibBuilder:
         self.composition_list_2 = composition_list_2
         self.structure_list_1 = structure_list_1
         self.structure_list_2 = structure_list_2
-        self.fail_list_1 = fail_list_1
-        self.fail_list_2 = fail_list_2
+        self.fail_list = fail_list
 
     def save_data(self):
         """ a method to save outputs """
@@ -263,7 +262,7 @@ class PDFLibBuilder:
         # composition
         for ind, compo in enumerate([self.composition_list_1,
                                      self.composition_list_2]):
-            f_name = "type{}_composition_list.yaml".format(ind+1)
+            f_name = "type{}_composition_list.yml".format(ind+1)
             w_name = os.path.join(output_dir,f_name)
             if compo:
                 print('INFO: saving {}'.format(w_name))
@@ -275,7 +274,7 @@ class PDFLibBuilder:
         # structure_meta
         for ind, meta in enumerate([self.structure_list_1,
                                     self.structure_list_2]):
-            f_name = "type{}_struc_meta.yaml".format(ind+1)
+            f_name = "type{}_struc_meta.yml".format(ind+1)
             w_name = os.path.join(output_dir, f_name)
             if meta:
                 print('INFO: saving {}'.format(w_name))
@@ -285,9 +284,9 @@ class PDFLibBuilder:
                 raise RuntimeError("{} is empty".format(f_name))
 
         # fail_list
-        for ind, meta in enumerate([self.fail_list_1,
-                                    self.fail_list_2]):
-            f_name = "type{}_fail_list.yaml".format(ind+1)
+        for ind, meta in enumerate(self.fail_list):
+            #f_name = "type{}_fail_list.yml".format(ind+1)
+            f_name = "fail_list.yml"
             w_name = os.path.join(output_dir,f_name)
             print('INFO: saving {}'.format(w_name))
             with open(w_name, 'w') as f:
