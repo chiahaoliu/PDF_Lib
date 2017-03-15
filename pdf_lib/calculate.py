@@ -43,6 +43,32 @@ def _timestampstr(timestamp):
                  float(timestamp)).strftime('%Y%m%d-%H%M')
     return timestring
 
+def find_nearest(std_array, val):
+    """function to find the index of nearest value"""
+    idx = (np.abs(std_array-val)).argmin()
+    return idx
+
+def theta2q(theta, wavelength):
+    """transform from 2theta to Q(A^-1)"""
+    _theta = theta.astype(float)
+    rad = np.deg2rad(_theta)
+    q = 4*np.pi/wavelength*np.sin(rad/2)
+    return q
+
+def assign_nearest(std_array, q_array, iq_val):
+    """assign value to nearest grid"""
+    idx_list = []
+    interp_iq = np.zeros_like(std_array)
+    for val in q_array:
+        idx_list.append(find_nearest(std_array, val))
+    interp_iq[idx_list]=iq_val
+    return interp_iq
+
+# define standard Q range
+wl = 0.18  # in A
+std_theta = np.arange(0, 90, 0.1)
+STD_Q = theta2q(std_theta, wl)
+
 
 class PDFLibBuilder:
     ''' a class that loads in .cif in given directory and compute
@@ -77,6 +103,7 @@ class PDFLibBuilder:
         #path_str = full_path.split('/')
         #parent_folder_name = path_str[-2]
         #self.stem = parent_folder_name
+        self.std_q = None
         stem, tail = os.path.split(full_path)
         self.stem = stem
         self.output_dir = None # overwrite it later
@@ -88,7 +115,8 @@ class PDFLibBuilder:
 
     def learninglib_build(self, output_dir=None, pdfcal_cfg=None,
                           rdf=True, Bisoequiv=0.1, rstep=None,
-                          DebyeCal=False, nosymmetry=False):
+                          DebyeCal=False, nosymmetry=False,
+                          std_q=None):
         """ method to build learning lib with diffpy based on path
         of cif library. Paramters of G(r) calculation are set
         via glbl.<attribute>. "PDFCal_config.txt" file with PDFCalculator
@@ -112,7 +140,9 @@ class PDFLibBuilder:
         nosymmetry : bool, optional
             DEPRECATED for now. option to apply no symmetry.
             default is False.
-
+        std_q : ndarray, optional
+            range of q. default is 2thetda = [0:0.1:90] with
+            wavelength=0.18 A.
         """
         # setup output dir
         timestr = _timestampstr(time.time())
@@ -121,6 +151,8 @@ class PDFLibBuilder:
             output_dir = os.path.join(os.getcwd(), tail)
         print('=== output dir would be {} ==='.format(output_dir))
         self.output_dir = output_dir
+        if std_q is None:
+            self.std_q = STD_Q
 
         ####### configure pymatgen XRD calculator #####
         # instantiate calculators
@@ -170,7 +202,7 @@ class PDFLibBuilder:
         ############# loop through cifs #################
         cif_f_list = [ f for f in os.listdir(self.input_dir) if
                        f.endswith('.cif')]
-        for cif in cif_f_list:
+        for cif in sorted(cif_f_list):
             _cif = os.path.join(self.input_dir, cif)
             try:
                 # diffpy structure
@@ -188,7 +220,10 @@ class PDFLibBuilder:
                 ## calculate XRD with pymatgen ##
                 xrd = xrd_cal.get_xrd_data(struc_meta\
                         .get_structures(False).pop())
-                xrd_list.append(np.asarray(xrd)[:,:2])
+                _xrd = np.asarray(xrd)[:,:2]
+                q, iq = _xrd.T
+                interp_q = assign_nearest(self.std_q, q, iq)
+                xrd_list.append(interp_q)
                 ## test space group info ##
                 _sg = struc_meta.get_structures(False).pop()\
                         .get_space_group_info()
