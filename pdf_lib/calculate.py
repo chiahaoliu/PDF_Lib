@@ -64,11 +64,6 @@ def assign_nearest(std_array, q_array, iq_val):
     interp_iq[idx_list]=iq_val
     return interp_iq
 
-# define standard Q range
-wl = 0.18  # in A
-std_theta = np.arange(0, 90, 0.1)
-STD_Q = theta2q(std_theta, wl)
-
 
 class PDFLibBuilder:
     ''' a class that loads in .cif in given directory and compute
@@ -162,7 +157,7 @@ class PDFLibBuilder:
         # instantiate calculators
         xrd_cal = XRDCalculator()
         xrd_cal.wavelength = self.wavelength
-        xrd_cal.TWO_THETA_TOL = 10**-1
+        xrd_cal.TWO_THETA_TOL = 10**-2
         self.calculate_params.update({'xrd_wavelength':
                                        xrd_cal.wavelength})
 
