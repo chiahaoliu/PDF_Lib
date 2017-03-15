@@ -5,6 +5,7 @@ import json
 import datetime
 import numpy as np
 from time import strftime
+from pprint import pprint
 import matplotlib.pyplot as plt
 
 from diffpy.Structure import loadStructure
@@ -128,9 +129,12 @@ class PDFLibBuilder:
 
         xrd_list = []
         sg_list = []
-        composition_list_1 = []
         # (a,b,c, alpha, beta, gamma, volume)
         structure_list_1 = []  # primative cell
+        structure_list_2 = []  # ordinary cell
+        # chemical element
+        composition_list_1 = []  # primative cell
+        composition_list_2 = []  # ordinary cell
         fail_list = []
 
         ####### configure diffpy PDF calculator ######
@@ -162,9 +166,6 @@ class PDFLibBuilder:
 
         # empty list to store results
         gr_list = []
-        composition_list_2 = []
-        # (a,b,c, alpha, beta, gamma, volume)
-        structure_list_2 = []
 
         ############# loop through cifs #################
         cif_f_list = [ f for f in os.listdir(self.input_dir) if
@@ -173,43 +174,53 @@ class PDFLibBuilder:
             _cif = os.path.join(self.input_dir, cif)
             try:
                 # diffpy structure
-                struc2 = loadStructure(_cif)
-                struc2.Bisoequiv = Bisoequiv
-                # pymatge structure
-                struc = CifParser(_cif).get_structures().pop()
+                struc = loadStructure(_cif)
+                struc.Bisoequiv = Bisoequiv
 
-                # calculate PDF/RDF with diffpy
+                ## calculate PDF/RDF with diffpy ##
                 #if nosymmetry:
                 #    (r,g) = cal(nosymmetry(struc), **pdfcal_cfg)
-                cal.setStructure(struc2)
+                cal.setStructure(struc)
                 cal.eval()
 
-                # calculate XRD with pymatgen
-                xrd = xrd_cal.get_xrd_data(struc)
+                # pymatge structure
+                struc_meta = CifParser(_cif)
+                ## calculate XRD with pymatgen ##
+                xrd = xrd_cal.get_xrd_data(struc_meta\
+                        .get_structures(False).pop())
+                xrd_list.append(np.asarray(xrd)[:,:2])
+                ## test space group info ##
+                _sg = struc_meta.get_structures(False).pop()\
+                        .get_space_group_info()
+            except:
+                fail_list.append(cif)
+            else:
+                # no error for both pymatgen and diffpy --> compute
 
-                # update features
                 if rdf:
                     gr_list.append(cal.rdf)
                 else:
                     gr_list.append(cal.pdf)
-                composition_list_2.append(struc2.composition)
-                meta_tuple2 = struc2.lattice.abcABG()+\
-                              (struc2.lattice.volume,)
-                structure_list_2.append(meta_tuple2)
                 print('=== Finished evaluating PDF from structure {} ==='
                        .format(cif))
 
-                xrd_list.append(np.asarray(xrd)[:,:2])
-                sg_list.append(struc.get_space_group_info())
-                meta_tuple = struc.lattice.abc + struc.lattice.angles\
-                             + (struc.volume,)
-
-                structure_list_1.append(meta_tuple)
-                composition_list_1.append(struc.composition.as_dict())
+                ## update features ##
+                # primitive cell
+                struc_1 = struc_meta.get_structures().pop()
+                meta_1 = struc_1.lattice.abc + struc_1.lattice.angles\
+                         + (struc_1.volume,)
+                structure_list_1.append(meta_1)
+                composition_list_1.append(struc_1.composition.as_dict())
+                # ordinary cell
+                struc_2 = struc_meta.get_structures(False).pop()
+                meta_2 = struc_2.lattice.abc + struc_2.lattice.angles\
+                         + (struc_2.volume,)
+                structure_list_2.append(meta_2)
+                composition_list_2.append(struc_2.composition.as_dict())
+                # sg info
+                sg_list.append(struc_2.get_space_group_info())
                 print('=== Finished evaluating XRD from structure {} ==='
                       .format(cif))
-            except:
-                fail_list.append(cif)
 
         # finally, store crucial calculation results as attributes
         self.r_grid = cal.rgrid
@@ -274,12 +285,14 @@ class PDFLibBuilder:
         # structure_meta
         for ind, meta in enumerate([self.structure_list_1,
                                     self.structure_list_2]):
-            f_name = "type{}_struc_meta.yml".format(ind+1)
+            #f_name = "type{}_struc_meta.yml".format(ind+1)
+            f_name = "type{}_struc_meta".format(ind+1)
             w_name = os.path.join(output_dir, f_name)
             if meta:
                 print('INFO: saving {}'.format(w_name))
-                with open(w_name, 'w') as f:
-                    yaml.dump(meta, f)
+                np.save(w_name, meta)
+                #with open(w_name, 'w') as f:
+                #    yaml.dump(meta, f)
             else:
                 raise RuntimeError("{} is empty".format(f_name))
 
@@ -293,5 +306,5 @@ class PDFLibBuilder:
                 yaml.dump(meta, f)
 
         print("======== SUMMARY ======== ")
-        print("Number of G(r) calculated is {}"
+        print("Number of fature calculated is {}"
               .format(np.shape(self.gr_array)[0]))
