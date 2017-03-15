@@ -116,7 +116,7 @@ class PDFLibBuilder:
     def learninglib_build(self, output_dir=None, pdfcal_cfg=None,
                           rdf=True, Bisoequiv=0.1, rstep=None,
                           DebyeCal=False, nosymmetry=False,
-                          std_q=None):
+                          tth_range=None, wavelength=0.5):
         """ method to build learning lib with diffpy based on path
         of cif library. Paramters of G(r) calculation are set
         via glbl.<attribute>. "PDFCal_config.txt" file with PDFCalculator
@@ -134,15 +134,17 @@ class PDFLibBuilder:
             value of isotropic thermal parameter. default is 0.1.
             scientific equation: Biso = 8 (pi**2) Uiso
         rstep : float, optioanl
-            space of PDF. default is pi/100.
+            space of PDF. default is pi/qmax.
         DebyeCal : bool, optional
             option to use Debye calculator. default is False.
         nosymmetry : bool, optional
             DEPRECATED for now. option to apply no symmetry.
             default is False.
-        std_q : ndarray, optional
-            range of q. default is 2thetda = [0:0.1:90] with
-            wavelength=0.18 A.
+        tth_range : ndarray, optional
+            range of 2theta. default is [0:0.1:90]
+        wavelength : float, optional
+            wavelength in angstroms, default to 0.5 A which corresponds
+            to Qmax ~= 17
         """
         # setup output dir
         timestr = _timestampstr(time.time())
@@ -151,13 +153,18 @@ class PDFLibBuilder:
             output_dir = os.path.join(os.getcwd(), tail)
         print('=== output dir would be {} ==='.format(output_dir))
         self.output_dir = output_dir
-        if std_q is None:
-            self.std_q = STD_Q
+        if tth_range is None:
+            self.tth_range = np.arange(0, 90, 0.1)
+        self.wavelength = wavelength
+        self.std_q = theta2q(self.tth_range, self.wavelength)
 
         ####### configure pymatgen XRD calculator #####
         # instantiate calculators
         xrd_cal = XRDCalculator()
-        self.calculate_params.update({'xrd_wavelength':xrd_cal.wavelength})
+        xrd_cal.wavelength = self.wavelength
+        xrd_cal.TWO_THETA_TOL = 10**-1
+        self.calculate_params.update({'xrd_wavelength':
+                                       xrd_cal.wavelength})
 
         xrd_list = []
         sg_list = []
@@ -191,14 +198,10 @@ class PDFLibBuilder:
         for k,v in pdfcal_cfg.items():
             setattr(cal, k, v)
 
-        print("==== Parameter used in this PDF calculator is: {} ===="
-              .format(pdfcal_cfg))
-        print("==== Bisoequiv used in this PDF calculator is: {} ===="
-              .format(Bisoequiv))
-
         # empty list to store results
         gr_list = []
-
+        print("====== INFO: calculation parameters:====\n{}"
+              .format(self.calculate_params))
         ############# loop through cifs #################
         cif_f_list = [ f for f in os.listdir(self.input_dir) if
                        f.endswith('.cif')]
@@ -260,7 +263,7 @@ class PDFLibBuilder:
         # finally, store crucial calculation results as attributes
         self.r_grid = cal.rgrid
         self.gr_array = np.asarray(gr_list)/4/np.pi/self.r_grid**2
-        self.xrd_info = xrd_list
+        self.xrd_info = np.asarray(xrd_list)
         self.sg_list = sg_list
         # 1 -> diffpy , 2 -> pymatgen
         self.composition_list_1 = composition_list_1
@@ -291,6 +294,11 @@ class PDFLibBuilder:
         r_grid_name ='rgrid'
         r_grid_w_name = os.path.join(output_dir, r_grid_name)
         np.save(r_grid_w_name, self.r_grid)
+
+        # std_q
+        q_grid_name = 'qgrid'
+        q_grid_w_name = os.path.join(output_dir, q_grid_name)
+        np.save(q_grid_w_name, self.std_q)
 
         # sg_list
         #sg_list_name = '{}_sg_list.yml'.format(timestr)
