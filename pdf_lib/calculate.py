@@ -109,8 +109,8 @@ class PDFLibBuilder:
         self.calculate_params = {}
 
     def learninglib_build(self, output_dir=None, pdfcal_cfg=None,
-                          rdf=True, Bisoequiv=0.1, rstep=None,
-                          DebyeCal=False, nosymmetry=False,
+                          rdf=True, xrd=False, Bisoequiv=0.1,
+                          rstep=None, DebyeCal=False, nosymmetry=False,
                           tth_range=None, wavelength=0.5):
         """ method to build learning lib with diffpy based on path
         of cif library. Paramters of G(r) calculation are set
@@ -125,6 +125,8 @@ class PDFLibBuilder:
         rdf : bool, optional
             option to compute RDF or not. default to True, if not,
             compute pdf
+        xrd : bool, optional
+            option to compute XRD (which is slow). default to False.
         Bisoequiv : float, optional
             value of isotropic thermal parameter. default is 0.1.
             scientific equation: Biso = 8 (pi**2) Uiso
@@ -176,6 +178,7 @@ class PDFLibBuilder:
             cal = DebyePDFCalculator()
             self.calculator_type = 'Debye'
         cal = PDFCalculator()
+        self.calculator = cal
         self.calculator_type = 'PDF'
         self.calculate_params.update({'calculator_type':
                                       self.calculator_type})
@@ -183,15 +186,16 @@ class PDFLibBuilder:
         if rstep is None:
             rstep = glbl.rstep
         self.rstep = rstep
+        self.calculator.rstep = rstep  # annoying fact
         self.calculate_params.update({'rstep':rstep})
 
         if pdfcal_cfg is None:
-            pdfcal_cfg = glbl.cfg
-        self.calculate_params.update(pdfcal_cfg)
+            self.pdfcal_cfg = glbl.cfg
+        self.calculate_params.update(self.pdfcal_cfg)
 
         # configure calculator
-        for k,v in pdfcal_cfg.items():
-            setattr(cal, k, v)
+        for k,v in self.pdfcal_cfg.items():
+            setattr(self.calculator, k, v)
 
         # empty list to store results
         gr_list = []
@@ -208,24 +212,29 @@ class PDFLibBuilder:
                 struc.Bisoequiv = Bisoequiv
 
                 ## calculate PDF/RDF with diffpy ##
-                #if nosymmetry:
-                #    (r,g) = cal(nosymmetry(struc), **pdfcal_cfg)
+                if nosymmetry:
+                    struc = nosymmetry(struc)
                 cal.setStructure(struc)
                 cal.eval()
+                #r,g = cal(struc, **self.calculate_params)
 
                 # pymatge structure
                 struc_meta = CifParser(_cif)
                 ## calculate XRD with pymatgen ##
-                xrd = xrd_cal.get_xrd_data(struc_meta\
-                        .get_structures(False).pop())
-                _xrd = np.asarray(xrd)[:,:2]
-                q, iq = _xrd.T
-                interp_q = assign_nearest(self.std_q, q, iq)
-                xrd_list.append(interp_q)
+                if xrd:
+                    xrd = xrd_cal.get_xrd_data(struc_meta\
+                            .get_structures(False).pop())
+                    _xrd = np.asarray(xrd)[:,:2]
+                    q, iq = _xrd.T
+                    interp_q = assign_nearest(self.std_q, q, iq)
+                    xrd_list.append(interp_q)
+                else:
+                    xrd_list = []
                 ## test space group info ##
                 _sg = struc_meta.get_structures(False).pop()\
                         .get_space_group_info()
             except:
+                print("{} fail".format(_cif))
                 fail_list.append(cif)
             else:
                 # no error for both pymatgen and diffpy --> compute
