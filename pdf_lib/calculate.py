@@ -269,7 +269,7 @@ class PDFLibBuilder:
         self.gr_array = np.asarray(gr_list)/4/np.pi/self.r_grid**2
         self.xrd_info = np.asarray(xrd_list)
         self.sg_list = sg_list
-        # 1 -> diffpy , 2 -> pymatgen
+        # 1 -> primitive , 2 -> ordinary
         self.composition_list_1 = composition_list_1
         self.composition_list_2 = composition_list_2
         self.structure_list_1 = structure_list_1
@@ -306,10 +306,10 @@ class PDFLibBuilder:
 
         # sg_list
         #sg_list_name = '{}_sg_list.yml'.format(timestr)
-        sg_list_name = 'sg_list.yml'
+        sg_list_name = 'sg_list.json'
         sg_list_w_name = os.path.join(output_dir, sg_list_name)
         with open(sg_list_w_name, 'w') as f:
-            yaml.dump(self.sg_list, f)
+            json.dump(self.sg_list, f)
 
         # xrd_info
         xrd_list_name = 'xrd_info'
@@ -318,14 +318,15 @@ class PDFLibBuilder:
 
         #TODO: simplify saving code
         # composition
+        fn_stem_list = ['primitive', 'ordinary']
         for ind, compo in enumerate([self.composition_list_1,
                                      self.composition_list_2]):
-            f_name = "type{}_composition_list.yml".format(ind+1)
+            f_name = "{}_composition_list.json".format(fn_stem_list[ind])
             w_name = os.path.join(output_dir,f_name)
             if compo:
                 print('INFO: saving {}'.format(w_name))
                 with open(w_name, 'w') as f:
-                    yaml.dump(compo, f)
+                    json.dump(compo, f)
             else:
                 raise RuntimeError("{} is empty".format(f_name))
 
@@ -333,7 +334,7 @@ class PDFLibBuilder:
         for ind, meta in enumerate([self.structure_list_1,
                                     self.structure_list_2]):
             #f_name = "type{}_struc_meta.yml".format(ind+1)
-            f_name = "type{}_struc_meta".format(ind+1)
+            f_name = "{}_struc_meta".format(fn_stem_list[ind])
             w_name = os.path.join(output_dir, f_name)
             if meta:
                 print('INFO: saving {}'.format(w_name))
@@ -346,11 +347,11 @@ class PDFLibBuilder:
         # fail_list
         for ind, meta in enumerate(self.fail_list):
             #f_name = "type{}_fail_list.yml".format(ind+1)
-            f_name = "fail_list.yml"
+            f_name = "fail_list.json"
             w_name = os.path.join(output_dir,f_name)
             print('INFO: saving {}'.format(w_name))
             with open(w_name, 'w') as f:
-                yaml.dump(meta, f)
+                json.dump(meta, f)
 
         print("======== SUMMARY ======== ")
         print("Number of fature calculated is {}"
