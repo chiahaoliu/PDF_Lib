@@ -196,7 +196,6 @@ class PDFLibBuilder:
         # configure calculator
         for k,v in self.pdfcal_cfg.items():
             setattr(self.calculator, k, v)
-
         # empty list to store results
         gr_list = []
         print("====== INFO: calculation parameters:====\n{}"
@@ -216,7 +215,6 @@ class PDFLibBuilder:
                     struc = nosymmetry(struc)
                 cal.setStructure(struc)
                 cal.eval()
-                #r,g = cal(struc, **self.calculate_params)
 
                 # pymatge structure
                 struc_meta = CifParser(_cif)
