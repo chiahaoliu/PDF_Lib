@@ -265,6 +265,7 @@ class PDFLibBuilder:
         # finally, store crucial calculation results as attributes
         self.r_grid = cal.rgrid
         self.gr_array = np.asarray(gr_list)/4/np.pi/self.r_grid**2
+        #4*pi * r^2 * rot(r) = R(r)  -> RDF to density 
         self.xrd_info = np.asarray(xrd_list)
         self.sg_list = sg_list
         # 1 -> primitive , 2 -> ordinary
