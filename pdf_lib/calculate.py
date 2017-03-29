@@ -264,8 +264,12 @@ class PDFLibBuilder:
 
         # finally, store crucial calculation results as attributes
         self.r_grid = cal.rgrid
-        self.gr_array = np.asarray(gr_list)/4/np.pi/self.r_grid**2
-        #4*pi * r^2 * rot(r) = R(r)  -> RDF to density 
+        if rdf:
+            #4*pi * r^2 * rho(r) = R(r)  -> RDF to density 
+            self.gr_array = np.asarray(gr_list)/4/np.pi/self.r_grid**2
+        else:
+            self.gr_array = np.asarray(gr_list)
+
         self.xrd_info = np.asarray(xrd_list)
         self.sg_list = sg_list
         # 1 -> primitive , 2 -> ordinary
@@ -344,13 +348,11 @@ class PDFLibBuilder:
                 raise RuntimeError("{} is empty".format(f_name))
 
         # fail_list
-        for ind, meta in enumerate(self.fail_list):
-            #f_name = "type{}_fail_list.yml".format(ind+1)
-            f_name = "fail_list.json"
-            w_name = os.path.join(output_dir,f_name)
-            print('INFO: saving {}'.format(w_name))
-            with open(w_name, 'w') as f:
-                json.dump(meta, f)
+        f_name = "fail_list.json"
+        w_name = os.path.join(output_dir,f_name)
+        print('INFO: saving {}'.format(w_name))
+        with open(w_name, 'w') as f:
+            json.dump(meta, f)
 
         print("======== SUMMARY ======== ")
         print("Number of fature calculated is {}"
