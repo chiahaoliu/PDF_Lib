@@ -105,7 +105,7 @@ class PDFLibBuilder:
         self.gr_array = None
         self.fail_list = None
         self.r_grid = None
-        self.density_list = None
+        self.density_list = []
         self.composition_list = None
         self.calculate_params = {}
 
