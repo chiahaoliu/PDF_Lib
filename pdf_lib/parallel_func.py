@@ -122,7 +122,7 @@ def map_learninglib(cif_path, xrd=False):
                 .get_space_group_info()
     except:
         print("{} fail".format(_cif))
-        fail_list.append(cif)
+        fail_list.append(_cif)
     else:
         # no error for both pymatgen and diffpy
         gr = cal.pdf
@@ -167,8 +167,8 @@ def map_learninglib(cif_path, xrd=False):
               "sg_list, composition_list_1, composition_list_2, struc_df, "
               "fail_list")
 
-    return gr_array, rdf_array, density, sg_list,\
-           composition_list_1, composition_list_2, struc_df, fail_list
+        return gr_array, rdf_array, density, sg_list,\
+               composition_list_1, composition_list_2, struc_df, fail_list
 
 
 def learninglib_build(cif_list, input_dir, xrd=False):
