@@ -4,6 +4,7 @@ import yaml
 import json
 import datetime
 import numpy as np
+import pandas as pd
 from time import strftime
 from pprint import pprint
 import matplotlib.pyplot as plt
@@ -95,19 +96,27 @@ class PDFLibBuilder:
         self.input_dir = input_dir
         #get the stem
         full_path = os.path.abspath(input_dir)
-        #path_str = full_path.split('/')
-        #parent_folder_name = path_str[-2]
-        #self.stem = parent_folder_name
-        self.std_q = None
         stem, tail = os.path.split(full_path)
         self.stem = stem
         self.output_dir = None # overwrite it later
-        self.gr_array = None
-        self.fail_list = None
+        # diffpy
         self.r_grid = None
+        self.gr_array = None
+        self.rdf_array = None
         self.density_list = []
-        self.composition_list = None
+        # pymatgen
+        self.xrd_array = None
+        self.std_q = None
+
+        self.fail_list = None
+
         self.calculate_params = {}
+
+        cif_list = sorted([ f for f in os.listdir(self.input_dir) if
+                              f.endswith('.cif')])
+        print("INFO: there are {} structures in input_dir"
+              .format(len(cif_list)))
+        self.cif_list = cif_list
 
     def learninglib_build(self, output_dir=None, pdfcal_cfg=None,
                           rdf=True, xrd=False, Bisoequiv=0.1,
@@ -199,12 +208,12 @@ class PDFLibBuilder:
             setattr(self.calculator, k, v)
         # empty list to store results
         gr_list = []
+        rdf_list = []
         print("====== INFO: calculation parameters:====\n{}"
               .format(self.calculate_params))
+        struc_df = pd.DataFrame()
         ############# loop through cifs #################
-        cif_f_list = [ f for f in os.listdir(self.input_dir) if
-                       f.endswith('.cif')]
-        for cif in sorted(cif_f_list):
+        for cif in sorted(self.cif_list):
             _cif = os.path.join(self.input_dir, cif)
             try:
                 # diffpy structure
@@ -237,47 +246,45 @@ class PDFLibBuilder:
                 fail_list.append(cif)
             else:
                 # no error for both pymatgen and diffpy
-                if rdf:
-                    gr_list.append(cal.rdf)
-                else:
-                    gr_list.append(cal.pdf)
+                gr_list.append(cal.pdf)
+                rdf_list.append(cal.rdf)
+                self.density_list.append(cal.slope)
                 print('=== Finished evaluating PDF from structure {} ==='
                        .format(cif))
-                self.density_list.append(cal.slope)
                 ## update features ##
-                # primitive cell
-                struc_1 = struc_meta.get_structures().pop()
-                meta_1 = struc_1.lattice.abc + struc_1.lattice.angles\
-                         + (struc_1.volume,)
-                structure_list_1.append(meta_1)
-                composition_list_1.append(struc_1.composition.as_dict())
-                # ordinary cell
-                struc_2 = struc_meta.get_structures(False).pop()
-                meta_2 = struc_2.lattice.abc + struc_2.lattice.angles\
-                         + (struc_2.volume,)
-                structure_list_2.append(meta_2)
-                composition_list_2.append(struc_2.composition.as_dict())
-                # sg info
-                sg_list.append(struc_2.get_space_group_info())
+                flag = ['primitive', 'ordinary']
+                option = [True, False]
+                compo_list = [composition_list_1, composition_list_2]
+                struc_fields = ['a','b','c','alpha','beta','gamma', 'volume']
+                for f, op, compo in zip(flag, option, compo_list):
+                    rv_dict = {}
+                    struc = struc_meta.get_structures(op).pop()
+                    a, b, c = struc.lattice.abc
+                    aa, bb, cc = struc.lattice.angles
+                    volume = struc.volume
+                    for k, v in zip(struc_fields,
+                                    [a, b, c, aa, bb, cc, volume]):
+                        rv_dict.update({"{}_{}".format(f, k) : v})
+                    compo.append(struc.composition.as_dict())
+                    struc_df = struc_df.append(rv_dict,
+                                               ignore_index=True)
+                # sg info, use the ordinary setup
+                sg_list.append(struc.get_space_group_info())
                 print('=== Finished evaluating XRD from structure {} ==='
                       .format(cif))
 
         # finally, store crucial calculation results as attributes
         self.r_grid = cal.rgrid
-        if rdf:
-            #4*pi * r^2 * rho(r) = R(r)  -> RDF to density 
-            self.gr_array = np.asarray(gr_list)/4/np.pi/self.r_grid**2
-        else:
-            self.gr_array = np.asarray(gr_list)
-
+        #4*pi * r^2 * rho(r) = R(r)  -> RDF to density 
+        self.gr_array = np.asarray(gr_list)/4/np.pi/self.r_grid**2
+        self.rdf_array = np.asarray(gr_list)
         self.density_list = np.asarray(self.density_list)
         self.xrd_info = np.asarray(xrd_list)
         self.sg_list = sg_list
         # 1 -> primitive , 2 -> ordinary
         self.composition_list_1 = composition_list_1
         self.composition_list_2 = composition_list_2
-        self.structure_list_1 = structure_list_1
-        self.structure_list_2 = structure_list_2
+        self.struc_df = struc_df
         self.fail_list = fail_list
 
     def save_data(self):
@@ -291,14 +298,11 @@ class PDFLibBuilder:
             f.write(str(para_dict))
 
         # save gr, r, composition and fail list
-        timestr = _timestampstr(time.time())
-        #gr_array_name = '{}_Gr'.format(timestr)
         gr_array_name = 'Gr'
         gr_array_w_name = os.path.join(output_dir, gr_array_name)
         np.save(gr_array_w_name, self.gr_array)
 
         # rgrid
-        #r_grid_name = '{}_rgrid'.format(timestr)
         r_grid_name ='rgrid'
         r_grid_w_name = os.path.join(output_dir, r_grid_name)
         np.save(r_grid_w_name, self.r_grid)
@@ -308,8 +312,12 @@ class PDFLibBuilder:
         q_grid_w_name = os.path.join(output_dir, q_grid_name)
         np.save(q_grid_w_name, self.std_q)
 
+        # density_list
+        f_name = 'density'
+        w_name = os.path.join(output_dir, f_name)
+        np.save(w_name, self.density_list)
+
         # sg_list
-        #sg_list_name = '{}_sg_list.yml'.format(timestr)
         sg_list_name = 'sg_list.json'
         sg_list_w_name = os.path.join(output_dir, sg_list_name)
         with open(sg_list_w_name, 'w') as f:
@@ -335,18 +343,9 @@ class PDFLibBuilder:
                 raise RuntimeError("{} is empty".format(f_name))
 
         # structure_meta
-        for ind, meta in enumerate([self.structure_list_1,
-                                    self.structure_list_2]):
-            #f_name = "type{}_struc_meta.yml".format(ind+1)
-            f_name = "{}_struc_meta".format(fn_stem_list[ind])
-            w_name = os.path.join(output_dir, f_name)
-            if meta:
-                print('INFO: saving {}'.format(w_name))
-                np.save(w_name, meta)
-                #with open(w_name, 'w') as f:
-                #    yaml.dump(meta, f)
-            else:
-                raise RuntimeError("{} is empty".format(f_name))
+        f_name = "struc_df.json"
+        w_name = os.path.join(output_dir, f_name)
+        self.struc_df.to_json(w_name)
 
         # fail_list
         f_name = "fail_list.json"
