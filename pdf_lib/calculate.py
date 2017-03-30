@@ -105,6 +105,7 @@ class PDFLibBuilder:
         self.gr_array = None
         self.fail_list = None
         self.r_grid = None
+        self.density_list = None
         self.composition_list = None
         self.calculate_params = {}
 
@@ -227,7 +228,7 @@ class PDFLibBuilder:
                     interp_q = assign_nearest(self.std_q, q, iq)
                     xrd_list.append(interp_q)
                 else:
-                    xrd_list = []
+                    pass
                 ## test space group info ##
                 _sg = struc_meta.get_structures(False).pop()\
                         .get_space_group_info()
@@ -235,15 +236,14 @@ class PDFLibBuilder:
                 print("{} fail".format(_cif))
                 fail_list.append(cif)
             else:
-                # no error for both pymatgen and diffpy --> compute
-
+                # no error for both pymatgen and diffpy
                 if rdf:
                     gr_list.append(cal.rdf)
                 else:
                     gr_list.append(cal.pdf)
                 print('=== Finished evaluating PDF from structure {} ==='
                        .format(cif))
-
+                self.density_list.append(cal.slope)
                 ## update features ##
                 # primitive cell
                 struc_1 = struc_meta.get_structures().pop()
@@ -270,6 +270,7 @@ class PDFLibBuilder:
         else:
             self.gr_array = np.asarray(gr_list)
 
+        self.density_list = np.asarray(self.density_list)
         self.xrd_info = np.asarray(xrd_list)
         self.sg_list = sg_list
         # 1 -> primitive , 2 -> ordinary
