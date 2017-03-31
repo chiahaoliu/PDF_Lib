@@ -123,6 +123,7 @@ def map_learninglib(cif_path, xrd=False):
     except:
         print("{} fail".format(_cif))
         fail_list.append(_cif)
+        return fail_list
     else:
         # no error for both pymatgen and diffpy
         gr = cal.pdf
@@ -130,27 +131,26 @@ def map_learninglib(cif_path, xrd=False):
         density = cal.slope
         print('=== Finished evaluating PDF from structure {} ==='
                .format(_cif))
+
         ## update features ##
         flag = ['primitive', 'ordinary']
         option = [True, False]
         compo_list = [composition_list_1, composition_list_2]
         struc_fields = ['a','b','c','alpha','beta','gamma',
-                        'volume', 'sg_label']
+                        'volume', 'sg_label', 'sg_order']
+        rv_dict = {}
         for f, op, compo in zip(flag, option, compo_list):
-            rv_dict = {}
             struc = struc_meta.get_structures(op).pop()
             a, b, c = struc.lattice.abc
             aa, bb, cc = struc.lattice.angles
             volume = struc.volume
-            sg = struc.get_space_group_info()
+            sg, sg_order = struc.get_space_group_info()
             for k, v in zip(struc_fields,
-                            [a, b, c, aa, bb, cc, volume, sg]):
+                            [a, b, c, aa, bb, cc, volume, sg,
+                                sg_order]):
                 rv_dict.update({"{}_{}".format(f, k) : v})
             compo.append(struc.composition.as_dict())
-            struc_df = struc_df.append(rv_dict,
-                                       ignore_index=True)
-        # sg info, use the ordinary setup
-        sg_list.append(struc.get_space_group_info())
+        struc_df = struc_df.append(rv_dict, ignore_index=True)
         print('=== Finished evaluating XRD from structure {} ==='
               .format(_cif))
 
@@ -213,6 +213,8 @@ def learninglib_build(cif_list, input_dir, xrd=False):
         except:
             print("{} fail".format(_cif))
             fail_list.append(cif)
+
+            return fail_list
         else:
             # no error for both pymatgen and diffpy
             gr_list.append(cal.pdf)
@@ -225,40 +227,39 @@ def learninglib_build(cif_list, input_dir, xrd=False):
             option = [True, False]
             compo_list = [composition_list_1, composition_list_2]
             struc_fields = ['a','b','c','alpha','beta','gamma',
-                            'volume', 'sg_label']
+                            'volume', 'sg_label', 'sg_order']
+            rv_dict = {}
             for f, op, compo in zip(flag, option, compo_list):
-                rv_dict = {}
                 struc = struc_meta.get_structures(op).pop()
                 a, b, c = struc.lattice.abc
                 aa, bb, cc = struc.lattice.angles
                 volume = struc.volume
-                sg = struc.get_space_group_info()
+                sg, sg_order = struc.get_space_group_info()
                 for k, v in zip(struc_fields,
-                                [a, b, c, aa, bb, cc, volume, sg]):
+                                [a, b, c, aa, bb, cc, volume, sg,
+                                    sg_order]):
                     rv_dict.update({"{}_{}".format(f, k) : v})
                 compo.append(struc.composition.as_dict())
-                struc_df = struc_df.append(rv_dict,
-                                           ignore_index=True)
-            # sg info, use the ordinary setup
-            sg_list.append(struc.get_space_group_info())
-            print('=== Finished evaluating XRD from structure {} ==='
-                  .format(cif))
+            struc_df = struc_df.append(rv_dict, ignore_index=True)
+            if xrd:
+                print('=== Finished evaluating XRD from structure {} ==='
+                      .format(cif))
 
-    # finally, store crucial calculation results as attributes
-    r_grid = cal.rgrid
-    #4*pi * r^2 * rho(r) = R(r)  -> RDF to density 
-    gr_array = np.asarray(gr_list)/4/np.pi/r_grid**2
-    rdf_array = np.asarray(rdf_list)
-    density_list = np.asarray(density_list)
-    xrd_info = np.asarray(xrd_list)
-    # 1 -> primitive , 2 -> ordinary
+            # finally, store crucial calculation results as attributes
+            r_grid = cal.rgrid
+            #4*pi * r^2 * rho(r) = R(r)  -> RDF to density 
+            gr_array = np.asarray(gr_list)/4/np.pi/r_grid**2
+            rdf_array = np.asarray(rdf_list)
+            density_list = np.asarray(density_list)
+            xrd_info = np.asarray(xrd_list)
+            # 1 -> primitive , 2 -> ordinary
 
-    print("Return : gr_array, rdf_array, density_list, xrd_info, "
-          "sg_list, composition_list_1, composition_list_2, struc_df, "
-          "fail_list")
+            print("Return : gr_array, rdf_array, density_list, xrd_info, "
+                  ", composition_list_1, composition_list_2, struc_df, "
+                  "fail_list")
 
-    return gr_array, rdf_array, density_list, xrd_info, sg_list,\
-           composition_list_1, composition_list_2, struc_df, fail_list
+            return gr_array, rdf_array, density_list, xrd_info,\
+                   composition_list_1, composition_list_2, struc_df, fail_list
 
 
 def save_data(rv, output_dir=None):
