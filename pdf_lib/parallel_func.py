@@ -157,8 +157,8 @@ def map_learninglib(cif_path, xrd=False):
         # finally, store crucial calculation results as attributes
         r_grid = cal.rgrid
         #4*pi * r^2 * rho(r) = R(r)  -> RDF to density 
-        gr_array = np.asarray(gr)/4/np.pi/r_grid**2
-        rdf_array = np.asarray(rdf)
+        gr_array = np.asarray(gr)
+        rdf_array = np.asarray(rdf)/4/np.pi/r_grid**2
         density = np.asarray(density)
         #xrd_info = np.asarray(xrd_list)
         # 1 -> primitive , 2 -> ordinary
@@ -167,7 +167,7 @@ def map_learninglib(cif_path, xrd=False):
               "sg_list, composition_list_1, composition_list_2, struc_df, "
               "fail_list")
 
-        return gr_array, rdf_array, density, sg_list,\
+        return gr_array, rdf_array, density, r_grid,\
                composition_list_1, composition_list_2, struc_df, fail_list
 
 
