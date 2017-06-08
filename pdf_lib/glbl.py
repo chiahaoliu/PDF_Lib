@@ -1,37 +1,30 @@
 # global properties
 import numpy as np
 
+
 # r_min and r_max used when reading PDF
 rmin = 0.5
-rmax = 25.
+rmax = 40. # extend to longer region, chop later
 
 # q_min and q_max used when calculating PDF
 qmin = 0.5
 qmax = 25.
 
 # Nynquist step
-rstep = np.pi / qmax
+rstep = (np.pi / qmax) + 1E-4
 
-# correction factor, so far I just guess
-dwFactor = 0.1
-bIsoequiv = 0.1
+# Qdamp value; use that one from XPD
+qdamp = 0.04
+qbroad = 0.04
+
+pdfCal_cfg = dict(rmin=rmin, rmax=rmax, qmin=qmin, qmax=qmax,
+                  qdamp=qdamp, qbroad=qbroad,
+                  rstep=(np.pi/qmax)+1E-4)
+
+# correction factor; used that ones from XPD
+delta2 = 2.3
+Uiso = 0.004
 
 # rows need to be skipped in standard g(r) files
 skipRow = 27
 
-# file name
-m_id_list_name= 'mid_list.yaml'
-
-
-# put calculation config together
-cfg = {'qmin': qmin, 'qmax': qmax, 'rmin': rmin, 'rmax': rmax}
-
-class Glbl:
-    cfg = cfg
-    rstep = rstep
-    skip_row = skipRow
-    DW_factor = dwFactor
-    Bisoequiv = bIsoequiv
-    m_id_list = m_id_list_name
-
-glbl = Glbl()

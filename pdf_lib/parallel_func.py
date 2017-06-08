@@ -18,8 +18,7 @@ from diffpy.srreal.pdfcalculator import PDFCalculator
 from pymatgen.io.cif import CifParser
 from pymatgen.analysis.diffraction.xrd import XRDCalculator
 
-from .glbl import glbl
-
+from .glbl import pdfCal_cfg, Uiso, delta2
 
 def _makedirs(path_name):
     '''function to support python2 stupid logic'''
@@ -72,63 +71,62 @@ calculate_params.update({'xrd_wavelength':
 
 ####### configure diffpy PDF calculator ######
 cal = PDFCalculator()
-# setup calculator parameters
-rstep = glbl.rstep
-cal.rstep = rstep  # annoying fact
-calculate_params.update({'rstep':rstep})
-Bisoequiv = 0.1
 
+def map_learninglib(cif_list, xrd=False):
+    """function designed for parallel computation
 
-pdfcal_cfg = glbl.cfg
-calculate_params.update(pdfcal_cfg)
-
-# configure calculator
-for k,v in pdfcal_cfg.items():
-    setattr(cal, k, v)
-
-
-def map_learninglib(cif_path, xrd=False):
-    _cif = cif_path
+    Parameters
+    ----------
+    cif_list : list
+        List of cif filenames
+    xrd : bool, optional
+        Wether to calculate xrd pattern. Default to False
+    """
+    _cif = cif_list
     sg_list = []
     fail_list = []
+    xrd_list = []
     struc_df = pd.DataFrame()
     composition_list_1 = []
     composition_list_2 = []
     try:
         # diffpy structure
         struc = loadStructure(_cif)
-        struc.Bisoequiv = Bisoequiv
+        struc.Uisoequiv = Uiso
+        print('pass struc load')
 
         ## calculate PDF/RDF with diffpy ##
-        cal.setStructure(struc)
-        cal.eval()
+        r_grid, gr = cal(struc, **pdfCal_cfg)
+        density = cal.slope
+        print('pass diffpy')
 
-        # pymatge structure
+        # pymatgen structure
         struc_meta = CifParser(_cif)
         ## calculate XRD with pymatgen ##
-        """
         if xrd:
             xrd = xrd_cal.get_xrd_data(struc_meta\
                     .get_structures(False).pop())
             _xrd = np.asarray(xrd)[:,:2]
             q, iq = _xrd.T
+            q = theta2q(q, wavelength)
             interp_q = assign_nearest(std_q, q, iq)
             xrd_list.append(interp_q)
         else:
             pass
-        """
-        ## test space group info ##
-        _sg = struc_meta.get_structures(False).pop()\
-                .get_space_group_info()
+        ## test if space group info can be parsed##
+        dummy_struc = struc_meta.get_structures(False).pop()
+        _sg = dummy_struc.get_space_group_info()
+        print('pass struc info')
     except:
         print("{} fail".format(_cif))
         fail_list.append(_cif)
+        # parallelized so direct return
         return fail_list
     else:
         # no error for both pymatgen and diffpy
-        gr = cal.pdf
-        rdf = cal.rdf
-        density = cal.slope
+        #gr = cal.pdf
+        #rdf = cal.rdf
+        #density = cal.slope
         print('=== Finished evaluating PDF from structure {} ==='
                .format(_cif))
 
@@ -146,29 +144,27 @@ def map_learninglib(cif_path, xrd=False):
             volume = struc.volume
             sg, sg_order = struc.get_space_group_info()
             for k, v in zip(struc_fields,
-                            [a, b, c, aa, bb, cc, volume, sg,
-                                sg_order]):
+                            [a, b, c, aa, bb, cc, volume,
+                             sg, sg_order]):
                 rv_dict.update({"{}_{}".format(f, k) : v})
             compo.append(struc.composition.as_dict())
         struc_df = struc_df.append(rv_dict, ignore_index=True)
-        print('=== Finished evaluating XRD from structure {} ==='
-              .format(_cif))
 
-        # finally, store crucial calculation results as attributes
-        r_grid = cal.rgrid
-        #4*pi * r^2 * rho(r) = R(r)  -> RDF to density 
-        gr_array = np.asarray(gr)
-        rdf_array = np.asarray(rdf)/4/np.pi/r_grid**2
-        density = np.asarray(density)
-        #xrd_info = np.asarray(xrd_list)
-        # 1 -> primitive , 2 -> ordinary
+       # print('=== Finished evaluating XRD from structure {} ==='
+       #       .format(_cif))
+        rv_name_list = ['gr', 'density', 'r_grid',
+                        'xrd_info', 'q_grid',
+                        'primitive_composition_list',
+                        'ordinary_composition_list',
+                        'struc_df', 'fail_list']
+        xrd_info = np.asarray(xrd_list)
+        q_grid = std_q
+        print('{:=^80}'.format(' Return '))
+        print('\n'.join(rv_name_list))
 
-        print("Return : gr_array, rdf_array, density_list, "
-              "sg_list, composition_list_1, composition_list_2, struc_df, "
-              "fail_list")
-
-        return gr_array, rdf_array, density, r_grid,\
-               composition_list_1, composition_list_2, struc_df, fail_list
+        return (gr, density, r_grid, xrd_info, q_grid,
+                composition_list_1, composition_list_2,
+                struc_df, fail_list)
 
 
 def learninglib_build(cif_list, input_dir, xrd=False):
@@ -247,8 +243,7 @@ def learninglib_build(cif_list, input_dir, xrd=False):
 
             # finally, store crucial calculation results as attributes
             r_grid = cal.rgrid
-            #4*pi * r^2 * rho(r) = R(r)  -> RDF to density 
-            gr_array = np.asarray(gr_list)/4/np.pi/r_grid**2
+            gr_array = np.asarray(gr_list)
             rdf_array = np.asarray(rdf_list)
             density_list = np.asarray(density_list)
             xrd_info = np.asarray(xrd_list)
