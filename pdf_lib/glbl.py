@@ -11,18 +11,18 @@ qmin = 0.5
 qmax = 25.
 
 # Nynquist step
-rstep = (np.pi / qmax) + 1E-4
+rstep = (np.pi / qmax) - 1E-4
 
 # Qdamp value; use that one from XPD
 qdamp = 0.04
 qbroad = 0.04
+delta2 = 2.3
 
 pdfCal_cfg = dict(rmin=rmin, rmax=rmax, qmin=qmin, qmax=qmax,
-                  qdamp=qdamp, qbroad=qbroad,
-                  rstep=(np.pi/qmax)+1E-4)
+                  qdamp=qdamp, qbroad=qbroad, rstep=rstep,
+                  delta2=delta2)
 
 # correction factor; used that ones from XPD
-delta2 = 2.3
 Uiso = 0.004
 
 # rows need to be skipped in standard g(r) files
