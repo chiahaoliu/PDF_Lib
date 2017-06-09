@@ -18,7 +18,7 @@ from diffpy.srreal.pdfcalculator import PDFCalculator
 from pymatgen.io.cif import CifParser
 from pymatgen.analysis.diffraction.xrd import XRDCalculator
 
-from .glbl import pdfCal_cfg, Uiso, delta2
+from .glbl import pdfCal_cfg, Uiso
 
 def _makedirs(path_name):
     '''function to support python2 stupid logic'''
