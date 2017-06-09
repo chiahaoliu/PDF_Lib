@@ -150,8 +150,8 @@ def map_learninglib(cif_list, xrd=False):
             compo.append(struc.composition.as_dict())
         struc_df = struc_df.append(rv_dict, ignore_index=True)
 
-       # print('=== Finished evaluating XRD from structure {} ==='
-       #       .format(_cif))
+        # print('=== Finished evaluating XRD from structure {} ==='
+        #       .format(_cif))
         rv_name_list = ['gr', 'density', 'r_grid',
                         'xrd_info', 'q_grid',
                         'primitive_composition_list',
@@ -167,31 +167,42 @@ def map_learninglib(cif_list, xrd=False):
                 struc_df, fail_list)
 
 
-def learninglib_build(cif_list, input_dir, xrd=False):
-    print("====== INFO: calculation parameters:====\n{}"
-          .format(calculate_params))
+def learninglib_build(cif_list, xrd=False):
+    """function designed for parallel computation
+
+    Parameters
+    ----------
+    cif_list : list
+        List of cif filenames
+    xrd : bool, optional
+        Wether to calculate xrd pattern. Default to False
+    """
     gr_list = []
-    rdf_list = []
     density_list = []
-    struc_df = pd.DataFrame()
     xrd_list = []
-    sg_list = []
-    composition_list_1 = []  # primative cell
-    composition_list_2 = []  # ordinary cell
+    struc_df = pd.DataFrame()
     fail_list = []
-    ############# loop through cifs #################
-    for cif in sorted(cif_list):
-        _cif = os.path.join(input_dir, cif)
+    composition_list_1 = []
+    composition_list_2 = []
+
+    # database fields
+    flag = ['primitive', 'ordinary']
+    option = [True, False]
+    compo_list = [composition_list_1, composition_list_2]
+    struc_fields = ['a','b','c','alpha','beta','gamma',
+                    'volume', 'sg_label', 'sg_order']
+    # looping
+    for _cif in sorted(cif_list):
         try:
             # diffpy structure
             struc = loadStructure(_cif)
-            struc.Bisoequiv = Bisoequiv
+            struc.Uisoequiv = Uiso
 
             ## calculate PDF/RDF with diffpy ##
-            cal.setStructure(struc)
-            cal.eval()
+            r_grid, gr = cal(struc, **pdfCal_cfg)
+            density = cal.slope
 
-            # pymatge structure
+            # pymatgen structure
             struc_meta = CifParser(_cif)
             ## calculate XRD with pymatgen ##
             if xrd:
@@ -199,31 +210,23 @@ def learninglib_build(cif_list, input_dir, xrd=False):
                         .get_structures(False).pop())
                 _xrd = np.asarray(xrd)[:,:2]
                 q, iq = _xrd.T
+                q = theta2q(q, wavelength)
                 interp_q = assign_nearest(std_q, q, iq)
                 xrd_list.append(interp_q)
             else:
                 pass
-            ## test space group info ##
-            _sg = struc_meta.get_structures(False).pop()\
-                    .get_space_group_info()
+            ## test if space group info can be parsed##
+            dummy_struc = struc_meta.get_structures(False).pop()
+            _sg = dummy_struc.get_space_group_info()
+        #except RuntimeError:  # allow exception to debug
         except:
             print("{} fail".format(_cif))
-            fail_list.append(cif)
-
-            return fail_list
+            fail_list.append(_cif)
         else:
             # no error for both pymatgen and diffpy
-            gr_list.append(cal.pdf)
-            rdf_list.append(cal.rdf)
-            density_list.append(cal.slope)
             print('=== Finished evaluating PDF from structure {} ==='
-                   .format(cif))
+                   .format(_cif))
             ## update features ##
-            flag = ['primitive', 'ordinary']
-            option = [True, False]
-            compo_list = [composition_list_1, composition_list_2]
-            struc_fields = ['a','b','c','alpha','beta','gamma',
-                            'volume', 'sg_label', 'sg_order']
             rv_dict = {}
             for f, op, compo in zip(flag, option, compo_list):
                 struc = struc_meta.get_structures(op).pop()
@@ -232,43 +235,50 @@ def learninglib_build(cif_list, input_dir, xrd=False):
                 volume = struc.volume
                 sg, sg_order = struc.get_space_group_info()
                 for k, v in zip(struc_fields,
-                                [a, b, c, aa, bb, cc, volume, sg,
-                                    sg_order]):
+                                [a, b, c, aa, bb, cc, volume,
+                                 sg, sg_order]):
                     rv_dict.update({"{}_{}".format(f, k) : v})
                 compo.append(struc.composition.as_dict())
             struc_df = struc_df.append(rv_dict, ignore_index=True)
-            if xrd:
-                print('=== Finished evaluating XRD from structure {} ==='
-                      .format(cif))
 
-            # finally, store crucial calculation results as attributes
-            r_grid = cal.rgrid
-            gr_array = np.asarray(gr_list)
-            rdf_array = np.asarray(rdf_list)
-            density_list = np.asarray(density_list)
-            xrd_info = np.asarray(xrd_list)
-            # 1 -> primitive , 2 -> ordinary
+            # storing results
+            gr_list.append(gr)
+            density_list.append(density)
 
-            print("Return : gr_array, rdf_array, density_list, xrd_info, "
-                  ", composition_list_1, composition_list_2, struc_df, "
-                  "fail_list")
+    # end of loop, storing turn result into ndarray
+    r_grid = cal.rgrid
+    gr_array = np.asarray(gr_list)
+    density_array = np.asarray(density_list)
+    xrd_info = np.asarray(xrd_list)
+    q_grid = std_q
 
-            return gr_array, rdf_array, density_list, xrd_info,\
-                   composition_list_1, composition_list_2, struc_df, fail_list
+    # talktive statement
+    rv_name_list = ['gr_array', 'density_array', 'r_grid',
+                    'xrd_info', 'q_grid',
+                    'primitive_composition_list',
+                    'ordinary_composition_list',
+                    'struc_df', 'fail_list']
+    print('{:=^80}'.format(' Return '))
+    print('\n'.join(rv_name_list))
 
+    rv = gr_array, density_array, r_grid, xrd_info, q_grid,\
+         composition_list_1, composition_list_2, struc_df, fail_list
 
-def save_data(rv, output_dir=None):
-    # setup output dir
+    return rv
+
+def save_data(output, output_dir=None):
+    """function should be called with learninglib_build"""
     timestr = _timestampstr(time.time())
     if output_dir is None:
         tail = "LearningLib_{}".format(timestr)
         output_dir = os.path.join(os.getcwd(), tail)
+    os.makedirs(output_dir)
     print('=== output dir would be {} ==='.format(output_dir))
-    f_name_list = ['Gr.npy', 'rdf.npy', 'density.npy', 'xrd_info.npy',
-                   'sg_list.json', 'primitive_composition.json',
+    f_name_list = ['Gr.npy', 'density.npy', 'r_grid.npy',
+                   'xrd_info.npy', 'primitive_composition.json',
                    'ordinary_composition.json', 'struc_df.json',
                    'fail_list.json']
-    for el, f_name in zip(rv, f_name_list):
+    for el, f_name in zip(output, f_name_list):
         w_name = os.path.join(output_dir, f_name)
         if f_name.endswith('.npy'):
             np.save(w_name, el)

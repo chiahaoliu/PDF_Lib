@@ -4,7 +4,7 @@ import numpy as np
 
 # r_min and r_max used when reading PDF
 rmin = 0.5
-rmax = 40. # extend to longer region, chop later
+rmax = 50. # extend to longer region, chop later
 
 # q_min and q_max used when calculating PDF
 qmin = 0.5
