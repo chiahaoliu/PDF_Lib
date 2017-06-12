@@ -263,39 +263,57 @@ def learninglib_build(cif_list, xrd=False):
 
     return rv
 
-# TODO: smart save function
-def save_data(output, output_dir=None):
-    """function should be called with learninglib_build"""
+
+# module dict to specify how to unpack rv
+RV_LOC_DICT = {'gr': 0, 'density': 1, 'r_grid': 2,
+               'xrd': 3, 'q_grid': 4,
+               'primitive_compo':5, 'ordinary_compo': 6,
+               'struc_df': 7, 'fail_list_map': 0,
+               'fail_list_apply': 8}
+RV_FN_DICT = {'gr': 'Gr.npy', 'density': 'density.npy',
+              'r_grid': 'rgrid.npy', 'xrd': 'xrd.npy',
+              'q_grid': 'qgrid.npy', 'struc_df': 'struc_df.csv',
+              'fail_list': 'fail_list.json'}
+
+def save_apply_result(apply_rv, output_dir=None):
+    """customized function to save result obtained from 'apply' function"""
     timestr = _timestampstr(time.time())
     if output_dir is None:
         tail = "LearningLib_{}".format(timestr)
         output_dir = os.path.join(os.getcwd(), tail)
     os.makedirs(output_dir)
     print('=== output dir would be {} ==='.format(output_dir))
-    f_name_list = ['Gr.npy', 'density.npy', 'r_grid.npy',
-                   'xrd_info.npy', 'primitive_composition.json',
-                   'ordinary_composition.json', 'struc_df.json',
-                   'fail_list.json']
-    for el, f_name in zip(output, f_name_list):
-        w_name = os.path.join(output_dir, f_name)
-        if f_name.endswith('.npy'):
-            np.save(w_name, el)
-        elif f_name.endswith('.json'):
-            print(w_name)
-            with open(w_name, 'w') as f:
-                json.dump(el, f)
-        print("INFO: saved {}".format(w_name))
 
+    # organizing results
+    _rv = apply_rv[0]
 
-# module dict to specify how to unpack rv
-RV_LOC_DICT = {'gr': 0, 'density': 1, 'r_grid': 2,
-               'xrd': 3, 'q_grid': 4,
-               'primitive_compo':5, 'ordinary_compo': 6,
-               'struc_df': 7, 'fail_fn': 0}
-RV_FN_DICT = {'gr': 'Gr.npy', 'density': 'density.npy',
-              'r_grid': 'rgrid.npy', 'xrd': 'xrd.npy',
-              'q_grid': 'qgrid.npy', 'struc_df': 'struc_df.csv',
-              'fail_list': 'fail_list.json'}
+    struc_df = _rv[RV_LOC_DICT['struc_df']]
+    primi_compo = _rv[RV_LOC_DICT['primitive_compo']]
+    ordin_compo = _rv[RV_LOC_DICT['ordinary_compo']]
+    struc_df['primitive_composition'] = primi_compo
+    struc_df['ordinary_composition'] = ordin_compo
+
+    w_name = os.path.join(output_dir, RV_FN_DICT['r_grid'])
+    np.save(w_name, _rv[RV_LOC_DICT['r_grid']])
+    print("INFO: saved {}".format(w_name))
+
+    w_name = os.path.join(output_dir, RV_FN_DICT['gr'])
+    np.save(w_name, _rv[RV_LOC_DICT['gr']])
+    print("INFO: saved {}".format(w_name))
+
+    w_name = os.path.join(output_dir, RV_FN_DICT['density'])
+    np.save(w_name, _rv[RV_LOC_DICT['density']])
+    print("INFO: saved {}".format(w_name))
+
+    w_name = os.path.join(output_dir, RV_FN_DICT['struc_df'])
+    struc_df.to_csv(w_name)
+    print("INFO: saved {}".format(w_name))
+
+    w_name = os.path.join(output_dir, RV_FN_DICT['fail_list'])
+    with open(w_name, 'w') as f:
+        json.dump(_rv[RV_LOC_DICT['fail_list_apply']], f)
+    print("INFO: saved {}".format(w_name))
+
 
 def join_map_result(map_rv, output_dir=None):
     """customized function to join and save results
@@ -308,6 +326,7 @@ def join_map_result(map_rv, output_dir=None):
     os.makedirs(output_dir)
     # initialize results being stored
     gr_array = []
+    density_list = []
     struc_df = pd.DataFrame()
     fail_list = []
     # NOTE: ignore xrd for now
@@ -315,6 +334,7 @@ def join_map_result(map_rv, output_dir=None):
     for el in map_rv:
         if len(el) != 1:
             gr_array.append(el[RV_LOC_DICT['gr']])
+            density_list.append(el[RV_LOC_DICT['density']])
             _df = pd.DataFrame(el[RV_LOC_DICT['struc_df']], copy=True)
             # insert two colums about composition info
             _df['ordinary_composition'] =\
@@ -324,22 +344,27 @@ def join_map_result(map_rv, output_dir=None):
             struc_df = struc_df.append(_df, ignore_index=True)
             rgrid = el[RV_LOC_DICT['r_grid']]
         else:
-            fail_list.append(el[RV_LOC_DICT['fail_fn']])
+            fail_list.append(el[RV_LOC_DICT['fail_list_map']])
     # save results
     w_name = os.path.join(output_dir, RV_FN_DICT['r_grid'])
     np.save(w_name, rgrid)
-    print("{} saved".format(w_name))
+    print("INFO: saved {}".format(w_name))
 
     gr_ar = np.asarray(gr_array)
     w_name = os.path.join(output_dir, RV_FN_DICT['gr'])
     np.save(w_name, gr_ar)
-    print("{} saved".format(w_name))
+    print("INFO: saved {}".format(w_name))
+
+    density_ar = np.asarray(density_list)
+    w_name = os.path.join(output_dir, RV_FN_DICT['density'])
+    np.save(w_name, _rv[RV_LOC_DICT['density']])
+    print("INFO: saved {}".format(w_name))
 
     w_name = os.path.join(output_dir, RV_FN_DICT['struc_df'])
     struc_df.to_csv(w_name)
-    print("{} saved".format(w_name))
+    print("INFO: saved {}".format(w_name))
 
     w_name = os.path.join(output_dir, RV_FN_DICT['fail_list'])
     with open(w_name, 'w') as f:
         json.dump(fail_list, f)
-    print("{} saved".format(w_name))
+    print("INFO: saved {}".format(w_name))
