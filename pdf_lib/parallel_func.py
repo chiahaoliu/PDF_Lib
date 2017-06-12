@@ -93,12 +93,10 @@ def map_learninglib(cif_list, xrd=False):
         # diffpy structure
         struc = loadStructure(_cif)
         struc.Uisoequiv = Uiso
-        print('pass struc load')
 
         ## calculate PDF/RDF with diffpy ##
         r_grid, gr = cal(struc, **pdfCal_cfg)
         density = cal.slope
-        print('pass diffpy')
 
         # pymatgen structure
         struc_meta = CifParser(_cif)
@@ -116,7 +114,6 @@ def map_learninglib(cif_list, xrd=False):
         ## test if space group info can be parsed##
         dummy_struc = struc_meta.get_structures(False).pop()
         _sg = dummy_struc.get_space_group_info()
-        print('pass struc info')
     except:
         print("{} fail".format(_cif))
         fail_list.append(_cif)
@@ -266,6 +263,7 @@ def learninglib_build(cif_list, xrd=False):
 
     return rv
 
+# TODO: smart save function
 def save_data(output, output_dir=None):
     """function should be called with learninglib_build"""
     timestr = _timestampstr(time.time())
@@ -283,6 +281,65 @@ def save_data(output, output_dir=None):
         if f_name.endswith('.npy'):
             np.save(w_name, el)
         elif f_name.endswith('.json'):
+            print(w_name)
             with open(w_name, 'w') as f:
                 json.dump(el, f)
         print("INFO: saved {}".format(w_name))
+
+
+# module dict to specify how to unpack rv
+RV_LOC_DICT = {'gr': 0, 'density': 1, 'r_grid': 2,
+               'xrd': 3, 'q_grid': 4,
+               'primitive_compo':5, 'ordinary_compo': 6,
+               'struc_df': 7, 'fail_fn': 0}
+RV_FN_DICT = {'gr': 'Gr.npy', 'density': 'density.npy',
+              'r_grid': 'rgrid.npy', 'xrd': 'xrd.npy',
+              'q_grid': 'qgrid.npy', 'struc_df': 'struc_df.csv',
+              'fail_list': 'fail_list.json'}
+
+def join_map_result(map_rv, output_dir=None):
+    """customized function to join and save results
+    from "map" result"""
+    # prepare dir for save
+    timestr = _timestampstr(time.time())
+    if output_dir is None:
+        tail = "LearningLib_{}".format(timestr)
+        output_dir = os.path.join(os.getcwd(), tail)
+    os.makedirs(output_dir)
+    # initialize results being stored
+    gr_array = []
+    struc_df = pd.DataFrame()
+    fail_list = []
+    # NOTE: ignore xrd for now
+    # looping and combine results
+    for el in map_rv:
+        if len(el) != 1:
+            gr_array.append(el[RV_LOC_DICT['gr']])
+            _df = pd.DataFrame(el[RV_LOC_DICT['struc_df']], copy=True)
+            # insert two colums about composition info
+            _df['ordinary_composition'] =\
+            el[RV_LOC_DICT['ordinary_compo']]
+            _df['primitive_composition'] =\
+            el[RV_LOC_DICT['primitive_compo']]
+            struc_df = struc_df.append(_df, ignore_index=True)
+            rgrid = el[RV_LOC_DICT['r_grid']]
+        else:
+            fail_list.append(el[RV_LOC_DICT['fail_fn']])
+    # save results
+    w_name = os.path.join(output_dir, RV_FN_DICT['r_grid'])
+    np.save(w_name, rgrid)
+    print("{} saved".format(w_name))
+
+    gr_ar = np.asarray(gr_array)
+    w_name = os.path.join(output_dir, RV_FN_DICT['gr'])
+    np.save(w_name, gr_ar)
+    print("{} saved".format(w_name))
+
+    w_name = os.path.join(output_dir, RV_FN_DICT['struc_df'])
+    struc_df.to_csv(w_name)
+    print("{} saved".format(w_name))
+
+    w_name = os.path.join(output_dir, RV_FN_DICT['fail_list'])
+    with open(w_name, 'w') as f:
+        json.dump(fail_list, f)
+    print("{} saved".format(w_name))
