@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from time import strftime
 from pprint import pprint
+from uuid import uuid4
 import matplotlib.pyplot as plt
 
 from diffpy.Structure import loadStructure
@@ -19,6 +20,7 @@ from pymatgen.io.cif import CifParser
 from pymatgen.analysis.diffraction.xrd import XRDCalculator
 
 from .glbl import pdfCal_cfg, Uiso
+assert Uiso == 0.005
 
 def _makedirs(path_name):
     '''function to support python2 stupid logic'''
@@ -345,6 +347,7 @@ def join_map_result(map_rv, output_dir=None):
             rgrid = el[RV_LOC_DICT['r_grid']]
         else:
             fail_list.append(el[RV_LOC_DICT['fail_list_map']])
+    print("INFO: finish grouping map result")
     # save results
     w_name = os.path.join(output_dir, RV_FN_DICT['r_grid'])
     np.save(w_name, rgrid)
@@ -357,7 +360,7 @@ def join_map_result(map_rv, output_dir=None):
 
     density_ar = np.asarray(density_list)
     w_name = os.path.join(output_dir, RV_FN_DICT['density'])
-    np.save(w_name, _rv[RV_LOC_DICT['density']])
+    np.save(w_name, density_ar)
     print("INFO: saved {}".format(w_name))
 
     w_name = os.path.join(output_dir, RV_FN_DICT['struc_df'])

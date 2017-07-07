@@ -1,5 +1,6 @@
 # script to execute database building
 
+import os
 from pdf_lib.parallel_func import (save_data, learninglib_build,
                                    map_learninglib)
 from ipyparallel import Client

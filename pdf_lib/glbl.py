@@ -23,7 +23,7 @@ pdfCal_cfg = dict(rmin=rmin, rmax=rmax, qmin=qmin, qmax=qmax,
                   delta2=delta2)
 
 # correction factor; used that ones from XPD
-Uiso = 0.004
+Uiso = 0.005
 
 # rows need to be skipped in standard g(r) files
 skipRow = 27
