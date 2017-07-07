@@ -28,3 +28,8 @@ Uiso = 0.005
 # rows need to be skipped in standard g(r) files
 skipRow = 27
 
+# rmax for bond distance calculation
+bond_range = 15
+
+# tolorance of atom positions
+eps = 0.001
