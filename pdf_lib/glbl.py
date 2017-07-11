@@ -29,7 +29,7 @@ Uiso = 0.005
 skipRow = 27
 
 # rmax for bond distance calculation
-bond_range = 15
+bond_range = 10
 
 # tolorance of atom positions
 eps = 0.001

@@ -22,7 +22,7 @@ from pymatgen.analysis.diffraction.xrd import XRDCalculator
 
 from .glbl import pdfCal_cfg, Uiso, bond_range, eps
 assert Uiso == 0.005
-assert bond_range == 15
+assert bond_range == 10
 assert eps == 0.001
 
 def _makedirs(path_name):
@@ -156,7 +156,7 @@ def map_learninglib(cif_fp, mode='bond_dst'):
                 rv_dict.update({"{}_{}".format(f, k) : v})
             compo_info =dict(struc.composition.as_dict())
             compo.append(compo_info)
-            rv_dict.update({"{}_composition".format(op): compo})
+            rv_dict.update({"{}_composition".format(f): compo})
         struc_df = struc_df.append(rv_dict, ignore_index=True)
 
         if mode=='pdf':
