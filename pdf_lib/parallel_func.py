@@ -172,6 +172,84 @@ def map_learninglib(cif_fp, mode='bond_dst'):
             return (uniq_dst, uniq_direction, struc_df)
 
 
+# module dict to specify how to unpack rv
+PDF_LOC_DICT = {'gr_array': 0, 'densityi_array': 1,
+                'r_grid': 2, 'struc_df': 3} 
+BOND_DIST_LOC_DICT = {'bond_dist_array': 0, 'bond_direction_array': 1,
+                      'struc_df': 2} 
+
+
+def join_and_save_map_result(map_rv, is_PDF=True, output_dir=None):
+    """helper function to join_and_save results from parallel map
+    calculation
+
+    Parameters
+    ----------
+    map_rv : ipyparallel.client.asyncresult.AsyncMapResult
+        result from ipyparallel.map_async to generate database
+    """
+    # prepare dir for save
+    timestr = _timestampstr(time.time())
+    if output_dir is None:
+        tail = "LearningLib_{}".format(timestr)
+        output_dir = os.path.join(os.getcwd(), tail)
+    _makedirs(output_dir)
+    # initialize results being stored
+    struc_df = pd.DataFrame()
+    fail_list = []
+    if is_PDF:
+        gr_array = []
+        density_array = []
+    else:
+        dist_array = []
+        direction_array = []
+    # looping and combine results
+    for el in map_rv:
+        if not isinstance(el, str):
+            if is_PDF:
+                gr_array.append(el[PDF_LOC_DICT['gr_array']])
+                density_array.append(el[PDF_LOC_DICT['density_array']])
+                #_df = pd.DataFrame(el[PDF_LOC_DICT['struc_df']],
+                #                   copy=True)
+                _df = el[PDF_LOC_DICT['struc_df']]
+                rgrid = el[PDF_LOC_DICT['r_grid']]
+            else:
+                dist_array.append(el[BOND_DIST_LOC_DICT['bond_dist_array']])
+                direction_array.append(el[BOND_DIST_LOC_DICT.get(
+                    'bond_direction_array')])
+                #_df = pd.DataFrame(el[BOND_DIST_LOC_DICT['struc_df']],
+                #                   copy=True)
+                _df = el[BOND_DIST_LOC_DICT['struc_df']]
+            struc_df = struc_df.append(_df, ignore_index=True)
+        else:
+            fail_list.append(el)
+    print("INFO: finish grouping map result")
+
+    # save results
+    if is_PDF:
+        for ar, fn in zip([gr_array, density_array, rgrid],
+                          ['gr_array', 'density_array', 'rgrid']):
+            w_name = os.path.join(output_dir, fn)
+            np.save(w_name, ar)
+            print("INFO: saved {}".format(w_name))
+    else:
+        for ar, fn in zip([np.asarray(dist_array),
+                           np.asarray(direction_array)],
+                          ['bond_dist_array', 'bond_direction_array']):
+            w_name = os.path.join(output_dir, fn)
+            np.save(w_name, ar)
+            print("INFO: saved {}".format(w_name))
+
+    w_name = os.path.join(output_dir, 'struc_df.csv')
+    struc_df.to_csv(w_name)
+    print("INFO: saved {}".format(w_name))
+
+    w_name = os.path.join(output_dir, 'fail_list.json')
+    with open(w_name, 'w') as f:
+        json.dump(fail_list, f)
+    print("INFO: saved {}".format(w_name))
+
+
 def learninglib_build(cif_list, xrd=False):
     """function designed for parallel computation
 
@@ -320,60 +398,4 @@ def save_apply_result(apply_rv, output_dir=None):
     w_name = os.path.join(output_dir, RV_FN_DICT['fail_list'])
     with open(w_name, 'w') as f:
         json.dump(_rv[RV_LOC_DICT['fail_list_apply']], f)
-    print("INFO: saved {}".format(w_name))
-
-
-def join_map_result(map_rv, output_dir=None):
-    """customized function to join and save results
-    from "map" result"""
-    # prepare dir for save
-    timestr = _timestampstr(time.time())
-    if output_dir is None:
-        tail = "LearningLib_{}".format(timestr)
-        output_dir = os.path.join(os.getcwd(), tail)
-    os.makedirs(output_dir)
-    # initialize results being stored
-    gr_array = []
-    density_list = []
-    struc_df = pd.DataFrame()
-    fail_list = []
-    # NOTE: ignore xrd for now
-    # looping and combine results
-    for el in map_rv:
-        if len(el) != 1:
-            gr_array.append(el[RV_LOC_DICT['gr']])
-            density_list.append(el[RV_LOC_DICT['density']])
-            _df = pd.DataFrame(el[RV_LOC_DICT['struc_df']], copy=True)
-            # insert two colums about composition info
-            _df['ordinary_composition'] =\
-            el[RV_LOC_DICT['ordinary_compo']]
-            _df['primitive_composition'] =\
-            el[RV_LOC_DICT['primitive_compo']]
-            struc_df = struc_df.append(_df, ignore_index=True)
-            rgrid = el[RV_LOC_DICT['r_grid']]
-        else:
-            fail_list.append(el[RV_LOC_DICT['fail_list_map']])
-    print("INFO: finish grouping map result")
-    # save results
-    w_name = os.path.join(output_dir, RV_FN_DICT['r_grid'])
-    np.save(w_name, rgrid)
-    print("INFO: saved {}".format(w_name))
-
-    gr_ar = np.asarray(gr_array)
-    w_name = os.path.join(output_dir, RV_FN_DICT['gr'])
-    np.save(w_name, gr_ar)
-    print("INFO: saved {}".format(w_name))
-
-    density_ar = np.asarray(density_list)
-    w_name = os.path.join(output_dir, RV_FN_DICT['density'])
-    np.save(w_name, density_ar)
-    print("INFO: saved {}".format(w_name))
-
-    w_name = os.path.join(output_dir, RV_FN_DICT['struc_df'])
-    struc_df.to_csv(w_name)
-    print("INFO: saved {}".format(w_name))
-
-    w_name = os.path.join(output_dir, RV_FN_DICT['fail_list'])
-    with open(w_name, 'w') as f:
-        json.dump(fail_list, f)
     print("INFO: saved {}".format(w_name))
