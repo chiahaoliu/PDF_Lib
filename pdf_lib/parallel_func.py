@@ -25,14 +25,6 @@ assert Uiso == 0.005
 assert bond_range == 10
 assert eps == 0.001
 
-def _makedirs(path_name):
-    '''function to support python2 stupid logic'''
-    if os.path.isdir(path_name):
-        pass
-    else:
-        os.makedirs(path_name)
-
-
 def _timestampstr(timestamp):
     ''' convert timestamp to strftime formate '''
     timestring = datetime.datetime.fromtimestamp(\
@@ -193,7 +185,7 @@ def join_and_save_map_result(map_rv, is_PDF=True, output_dir=None):
     if output_dir is None:
         tail = "LearningLib_{}".format(timestr)
         output_dir = os.path.join(os.getcwd(), tail)
-    _makedirs(output_dir)
+    os.makedirs(output_dir)
     # initialize results being stored
     struc_df = pd.DataFrame()
     fail_list = []
